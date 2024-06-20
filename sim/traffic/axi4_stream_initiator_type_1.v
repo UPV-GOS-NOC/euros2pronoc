@@ -159,7 +159,7 @@ module axi4_stream_initiator_type_1 #(
     if(!rst_m_axis_ni) begin
       end_of_stream_generation <= 1'b0;
     end else begin
-      if ( last_transfer_of_current_packet && last_packet_of_current_frame && last_frame_of_current_stream) begin
+      if ( last_transfer_of_current_packet && last_packet_of_current_frame && last_frame_of_current_stream && tvalid && tready) begin
         if (AxiStreamInitiatorIfInitiatorMode == "SINGLE") begin
           $display("@A4SG_T1 SINGLE Stream mode detected");
           $display("          END of stream reached");
