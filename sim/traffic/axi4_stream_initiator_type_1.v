@@ -98,7 +98,7 @@ module axi4_stream_initiator_type_1 #(
   //
   localparam [AxiStreamInitiatorIfTDataWidth-1:0] TDataInitialValue   = (AxiStreamInitiatorIfTDataWidth <= 8)  ? 'ha0 :
                                                                         (AxiStreamInitiatorIfTDataWidth <= 16) ? 'h0a00 :
-                                                                        'habcd0a00;  // (AxiStreamInitiatorIfTDataWidth >= 32)
+                                                                        'habc00b00;  // (AxiStreamInitiatorIfTDataWidth >= 32)
   localparam [AxiStreamInitiatorIfTDataWidth-1:0] TDataIncrementValue = (AxiStreamInitiatorIfTDataWidth <= 8)  ? 'h01 :
                                                                         (AxiStreamInitiatorIfTDataWidth <= 16) ? 'h0101 :
                                                                         'h00010001;
