@@ -203,7 +203,8 @@ module axis_data_upsizer #(
      s_transfer_tlast <= 1'b0;
     end else begin
       if (s_axis_tvalid) begin
-        if (fsm_du_current_state == FSM_DU_ST_GET_DATA) begin
+        //if (fsm_du_current_state == FSM_DU_ST_GET_DATA) begin
+        if(fsm_du_current_byte_index == 'b0) begin
           s_transfer_tid <= s_axis_tid;
           s_transfer_tdest <= s_axis_tdest;
           s_transfer_tlast <= s_axis_tlast;
