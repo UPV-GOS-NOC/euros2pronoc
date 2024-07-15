@@ -1,0 +1,35 @@
+`ifndef __ROUTING_LBDR_2D_H__
+`define __ROUTING_LBDR_2D_H__
+ 
+`include "net_common.h"
+
+//`define ROUTING_PORT_NORTH (5'b10000)
+//`define ROUTING_PORT_EAST  (5'b01000)
+//`define ROUTING_PORT_WEST  (5'b00100)
+//`define ROUTING_PORT_SOUTH (5'b00010)
+//`define ROUTING_PORT_LOCAL (5'b00000)
+`define LBDR_2D_NUM_PORT_DIRECTIONS 5
+
+`define LBDR_2D_PORT_DIRECTION_INDEX_NORTH (3'd4)
+`define LBDR_2D_PORT_DIRECTION_INDEX_EAST  (3'd3)
+`define LBDR_2D_PORT_DIRECTION_INDEX_WEST  (3'd2)
+`define LBDR_2D_PORT_DIRECTION_INDEX_SOUTH (3'd1)
+`define LBDR_2D_PORT_DIRECTION_INDEX_LOCAL (3'd0)
+
+`define LBDR_2D_NUM_BITS 12
+
+`define LBDR_2D_BIT_RNE 4'd11
+`define LBDR_2D_BIT_RNW 4'd10
+`define LBDR_2D_BIT_REN 4'd9
+`define LBDR_2D_BIT_RES 4'd8
+`define LBDR_2D_BIT_RWN 4'd7
+`define LBDR_2D_BIT_RWS 4'd6
+`define LBDR_2D_BIT_RSE 4'd5
+`define LBDR_2D_BIT_RSW 4'd4
+
+`define LBDR_2D_BIT_CN 4'd3
+`define LBDR_2D_BIT_CE 4'd2
+`define LBDR_2D_BIT_CW 4'd1
+`define LBDR_2D_BIT_CS 4'd0
+
+`endif
