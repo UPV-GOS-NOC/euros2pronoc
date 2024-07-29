@@ -106,7 +106,11 @@ module SWITCH_VC #(
   parameter ENABLE_VN_WEIGHTS_SUPPORT = "yes",       //! Enable for weighted arbiters (to provide bandwidth guarantees to each VN)
   parameter VN_WEIGHT_VECTOR_w = 20,                //! width of the weight vector in bits
   //
+  localparam ROUTING_ALGORITHM_TYPE     = "XY",                                                    //! routing algoritm type,
+  localparam [`AXIS_DIRECTION_WIDTH-1:0]  NodeIdIncreaseXAxis = `DIRECTION_EAST,                   //! Node ID increment direction in X axis  Supported values: EASTWARDS WESTWARDS
+  localparam [`AXIS_DIRECTION_WIDTH-1:0]  NodeIdIncreaseYAxis = `DIRECTION_SOUTH,                  //! Node ID increment direction in Y axis. Supported values: NORTHWARDS SOUTHWARDS 
   localparam NUM_PORTS                  = 5,                                                       //! Number of ports
+    
   localparam VN_X_VC_w                  = Log2_w(NUM_VC * NUM_VN),                                 //! width for a VNxVC identifier
   localparam NUM_VN_X_VC                = NUM_VN * NUM_VC,                                         //! number of VNxVCs
   localparam VN_w                       = Log2_w(NUM_VN),                                          //! width for a VN identifier
@@ -593,6 +597,10 @@ module SWITCH_VC #(
     .BROADCAST_SIZE                ( BROADCAST_SIZE                    ),
     .DATA_NET_FLIT_DST_UNIT_ID_LSB ( DATA_NET_FLIT_DST_UNIT_ID_LSB     ),
     .DATA_NET_FLIT_DST_UNIT_ID_MSB ( DATA_NET_FLIT_DST_UNIT_ID_MSB     ),
+    .ROUTING_ALGORITHM_TYPE        ( ROUTING_ALGORITHM_TYPE            ),
+    .NodeIdIncreaseXAxis           ( NodeIdIncreaseXAxis               ),
+    .NodeIdIncreaseYAxis           ( NodeIdIncreaseYAxis               ),
+    .NUM_PORTS                     ( NUM_PORTS                         ),
     .PORT                          ( `PORT_E                           )
   ) ROUTING_EAST (
     .clk                           ( clk                                                            ),
@@ -649,6 +657,10 @@ module SWITCH_VC #(
     .BROADCAST_SIZE                ( BROADCAST_SIZE                    ),
     .DATA_NET_FLIT_DST_UNIT_ID_LSB ( DATA_NET_FLIT_DST_UNIT_ID_LSB     ),
     .DATA_NET_FLIT_DST_UNIT_ID_MSB ( DATA_NET_FLIT_DST_UNIT_ID_MSB     ),
+    .ROUTING_ALGORITHM_TYPE        ( ROUTING_ALGORITHM_TYPE            ),
+    .NodeIdIncreaseXAxis           ( NodeIdIncreaseXAxis               ),
+    .NodeIdIncreaseYAxis           ( NodeIdIncreaseYAxis               ),
+    .NUM_PORTS                     ( NUM_PORTS                         ),
     .PORT                          ( `PORT_L                           )
   ) ROUTING_LOCAL (
     .clk                           ( clk                                                            ),
@@ -705,6 +717,10 @@ module SWITCH_VC #(
     .BROADCAST_SIZE                ( BROADCAST_SIZE                    ),
     .DATA_NET_FLIT_DST_UNIT_ID_LSB ( DATA_NET_FLIT_DST_UNIT_ID_LSB     ),
     .DATA_NET_FLIT_DST_UNIT_ID_MSB ( DATA_NET_FLIT_DST_UNIT_ID_MSB     ),
+    .ROUTING_ALGORITHM_TYPE        ( ROUTING_ALGORITHM_TYPE            ),
+    .NodeIdIncreaseXAxis           ( NodeIdIncreaseXAxis               ),
+    .NodeIdIncreaseYAxis           ( NodeIdIncreaseYAxis               ),
+    .NUM_PORTS                     ( NUM_PORTS                         ),
     .PORT                          ( `PORT_N                           )
   ) ROUTING_NORTH (
     .clk                           ( clk                                                            ),
@@ -762,6 +778,10 @@ module SWITCH_VC #(
     .BROADCAST_SIZE                ( BROADCAST_SIZE                    ),
     .DATA_NET_FLIT_DST_UNIT_ID_LSB ( DATA_NET_FLIT_DST_UNIT_ID_LSB     ),
     .DATA_NET_FLIT_DST_UNIT_ID_MSB ( DATA_NET_FLIT_DST_UNIT_ID_MSB     ),
+    .ROUTING_ALGORITHM_TYPE        ( ROUTING_ALGORITHM_TYPE            ),
+    .NodeIdIncreaseXAxis           ( NodeIdIncreaseXAxis               ),
+    .NodeIdIncreaseYAxis           ( NodeIdIncreaseYAxis               ),
+    .NUM_PORTS                     ( NUM_PORTS                         ),
     .PORT                          ( `PORT_S                           )
   ) ROUTING_SOUTH (
     .clk                           ( clk                                                            ),
@@ -818,8 +838,11 @@ module SWITCH_VC #(
     .BROADCAST_SIZE                ( BROADCAST_SIZE                    ),
     .DATA_NET_FLIT_DST_UNIT_ID_LSB ( DATA_NET_FLIT_DST_UNIT_ID_LSB     ),
     .DATA_NET_FLIT_DST_UNIT_ID_MSB ( DATA_NET_FLIT_DST_UNIT_ID_MSB     ),
+    .ROUTING_ALGORITHM_TYPE        ( ROUTING_ALGORITHM_TYPE            ),
+    .NodeIdIncreaseXAxis           ( NodeIdIncreaseXAxis               ),
+    .NodeIdIncreaseYAxis           ( NodeIdIncreaseYAxis               ),
+    .NUM_PORTS                     ( NUM_PORTS                         ),
     .PORT                          ( `PORT_W                           )
-
   ) ROUTING_WEST  (
     .clk                           ( clk                                                            ),
     .rst_p                         ( rst_p                                                          ),  

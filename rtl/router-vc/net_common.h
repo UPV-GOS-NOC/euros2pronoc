@@ -57,7 +57,13 @@
 `define PORT_N                  3'b101      // Nort port id code
 `define PORT_S                  3'b111      // South port id code
 
+// number of bit necessary to encode the DIRECTION text string (each char requires 8 bits)
+`define AXIS_DIRECTION_WIDTH 120
 
+`define DIRECTION_NORTH "DIRECTION_NORTH"
+`define DIRECTION_EAST  "DIRECTION_EAST"
+`define DIRECTION_WEST  "DIRECTION_WEST"
+`define DIRECTION_SOUTH "DIRECTION_SOUTH"
 
 
 //****************************************************************************

@@ -42,6 +42,7 @@
 
 `include "macro_functions.h"
 `include "net_common.h"
+`include "routing_lbdr_2d.h"
 
 //! Routing module with VC and VN support. This module performs the routing of the switch. A routing module is instantiated on every input queue 
 //! of a switch's input port. Each VC of each VN has its own ROUTING_VC module (and its own IBUFFER module). 
@@ -75,6 +76,11 @@ module ROUTING_VC #(
   parameter GLBL_N_NxT_w       = 0,             //! Global Nodes per tile width
   parameter GLBL_N_Nodes_w     = 1,             //! Total nodes width   
   parameter GLBL_SWITCH_ID_w   = 1,             //! ID width for switches
+  parameter ROUTING_ALGORITHM_TYPE = "XY",      //! Algorithm for routing, supported types are: LBDR_2D, XY (default)
+  parameter [`AXIS_DIRECTION_WIDTH-1:0]  NodeIdIncreaseXAxis = `DIRECTION_EAST,   //! Node ID increment direction in X axis  Supported values: EASTWARDS WESTWARDS
+  parameter [`AXIS_DIRECTION_WIDTH-1:0]  NodeIdIncreaseYAxis = `DIRECTION_NORTH,   //! Node ID increment direction in Y axis. Supported values: NORTHWARDS SOUTHWARDS
+  parameter integer NumberOfLBDRBits  = 0, 
+  parameter NUM_PORTS          = `NUM_PORTS,
   parameter PORT               = 0,             //! Port identifier (can be PORT_N, PORT_E, PORT_W, PORT_S, PORT_L)
   parameter FLIT_SIZE          = 64,            //! flit size in bits
   parameter FLIT_TYPE_SIZE     = 2,             //! flit type size in bits
@@ -121,6 +127,8 @@ module ROUTING_VC #(
     output                      BroadcastFlitW, //! OUT interface: broadcast bit to west direction
     output                      BroadcastFlitS,	//! OUT interface: broadcast bit to south direction
     output                      BroadcastFlitL, //! OUT interface: broadcast bit to local direction
+    //
+    input [NumberOfLBDRBits-1:0]lbdr_bits_i,    //! LBDR coonfiguration bits (Routing and connectivity). Signal coming from FileReg module
     //
     input                       clk,            //! clock signal
     input                       rst_p           //! reset signal
@@ -189,11 +197,87 @@ localparam ID_SIZE = GLBL_SWITCH_ID_w;                  //! ID width
       assign y_dst = 1'b0;
     end 
 
-    wire N1 = (x_cur == x_dst) & (y_cur > y_dst)  & ~bc;
-    wire E1 = (x_cur < x_dst)                     & ~bc;
-    wire W1 = (x_cur > x_dst)                     & ~bc;
-    wire S1 = (x_cur == x_dst) & (y_cur < y_dst)  & ~bc;
-    wire L1 = (x_cur == x_dst) & (y_cur == y_dst) & ~bc;
+    wire routing_algorithm_port_north;
+    wire routing_algorithm_port_east;
+    wire routing_algorithm_port_west;
+    wire routing_algorithm_port_south;
+    wire routing_algorithm_port_local;
+    wire [NUM_PORTS-1 : 0] routing_algorithm_outports; 
+    
+    generate 
+      if (ROUTING_ALGORITHM_TYPE == "LBDR_2D") begin
+        routing_algorithm_lbdr_2d #(
+          .NodeId           (ID),
+          .DimensionXWidth  (DIMX_w),
+          .DimensionYWidth  (DIMY_w),
+          .NodeIdIncreaseXAxis (NodeIdIncreaseXAxis),
+          .NodeIdIncreaseYAxis (NodeIdIncreaseYAxis),
+          .NumberOfLBDRBits (NumberOfLBDRBits),
+          .NumberOfPorts    (`NUM_PORTS), //! number of ports in the router N-E-W-S-L
+          .NumberOfLBDRBits (`LBDR_2D_NUM_BITS)
+        ) routing_algorithm_lbdr_2d_inst (
+          .x_cur_i   (x_cur),
+          .y_cur_i   (y_cur),
+          .x_dst_i   (x_dst),
+          .y_dst_i   (y_dst),
+          .lbdr_bits_i   (lbdr_bits_i),
+          .valid_ports_out_o (routing_algorithm_outports)
+        ); 
+        assign routing_algorithm_port_north = routing_algorithm_outports[`LBDR_2D_PORT_DIRECTION_INDEX_NORTH];
+        assign routing_algorithm_port_east  = routing_algorithm_outports[`LBDR_2D_PORT_DIRECTION_INDEX_EAST];
+        assign routing_algorithm_port_west  = routing_algorithm_outports[`LBDR_2D_PORT_DIRECTION_INDEX_WEST];
+        assign routing_algorithm_port_south = routing_algorithm_outports[`LBDR_2D_PORT_DIRECTION_INDEX_SOUTH];
+        assign routing_algorithm_port_local = routing_algorithm_outports[`LBDR_2D_PORT_DIRECTION_INDEX_LOCAL];
+      end else if (ROUTING_ALGORITHM_TYPE == "XY")begin
+        routing_algorithm_xy #(
+          .NodeId           (ID),
+          .DimensionXWidth  (DIMX_w),
+          .DimensionYWidth  (DIMY_w),
+          .NodeIdIncreaseXAxis (NodeIdIncreaseXAxis),
+          .NodeIdIncreaseYAxis (NodeIdIncreaseYAxis),
+          .NumberOfPorts    (`NUM_PORTS) //! number of ports in the router N-E-W-S-L
+        ) routing_algorithm_xy_inst (
+          .x_cur_i   (x_cur),
+          .y_cur_i   (y_cur),
+          .x_dst_i   (x_dst),
+          .y_dst_i   (y_dst),
+          .valid_ports_out_o (routing_algorithm_outports)
+          
+        );
+        assign routing_algorithm_port_north = routing_algorithm_outports[`XY_PORT_DIRECTION_INDEX_NORTH];
+        assign routing_algorithm_port_east  = routing_algorithm_outports[`XY_PORT_DIRECTION_INDEX_EAST];
+        assign routing_algorithm_port_west  = routing_algorithm_outports[`XY_PORT_DIRECTION_INDEX_WEST];
+        assign routing_algorithm_port_south = routing_algorithm_outports[`XY_PORT_DIRECTION_INDEX_SOUTH];
+        assign routing_algorithm_port_local = routing_algorithm_outports[`XY_PORT_DIRECTION_INDEX_LOCAL];
+      end else begin
+        routing_algorithm_xy #(
+          .NodeId        (ID),
+          .DIMX_w        (DIMX_w),
+          .DIMY_w        (DIMY_w),
+          .NodeIdIncreaseXAxis (NodeIdIncreaseXAxis),
+          .NodeIdIncreaseYAxis (NodeIdIncreaseYAxis),
+          .NumberOfPorts (`NUM_PORTS) //! number of ports in the router N-E-W-S-L
+        ) routing_algorithm_xy_inst (
+          .x_cur_i   (x_cur),
+          .y_cur_i   (y_cur),
+          .x_dst_i   (x_dst),
+          .y_dst_i   (y_dst),
+          .valid_ports_out_o (routing_algorithm_outports)
+        );
+        assign routing_algorithm_port_north = routing_algorithm_outports[`XY_PORT_DIRECTION_INDEX_NORTH];
+        assign routing_algorithm_port_east  = routing_algorithm_outports[`XY_PORT_DIRECTION_INDEX_EAST];
+        assign routing_algorithm_port_west  = routing_algorithm_outports[`XY_PORT_DIRECTION_INDEX_WEST];
+        assign routing_algorithm_port_south = routing_algorithm_outports[`XY_PORT_DIRECTION_INDEX_SOUTH];
+        assign routing_algorithm_port_local = routing_algorithm_outports[`XY_PORT_DIRECTION_INDEX_LOCAL];
+      end
+    endgenerate
+    
+    wire N1 = routing_algorithm_port_north & ~bc;
+    wire E1 = routing_algorithm_port_east  & ~bc;
+    wire W1 = routing_algorithm_port_west  & ~bc;
+    wire S1 = routing_algorithm_port_south & ~bc;
+    wire L1 = routing_algorithm_port_local & ~bc;
+
     //end unicast
 
     //broadcast output port computation
