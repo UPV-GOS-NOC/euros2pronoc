@@ -116,6 +116,9 @@ module network_data_axis_downsizer #
   wire [NocDataWidth-1:0]     fsm_flit;
   wire [flitTypeSize-1:0]     fsm_flit_type;
 
+  wire			                  wait_tlast;
+  wire                        empty_tail_tlast;
+
   //----------------------------------------------------------------------------------------------
   // Assigns
   
@@ -129,7 +132,8 @@ module network_data_axis_downsizer #
 
 
   // Control signals
-  assign last_no_tkeep = ((flit_type == HEADER_TAIL) | (flit_type == TAIL)) & (last_byte); 
+  assign last_no_tkeep = ((flit_type == HEADER_TAIL) | (flit_type == TAIL) | (empty_tail_tlast)) 
+                          & (last_byte); 
   assign tlast_output = last_no_tkeep;
   assign network_ready_o = wrapper_ready;
   assign fsm_ready = empty_buffer | (last_byte & m_axis_tready);
@@ -140,7 +144,10 @@ module network_data_axis_downsizer #
   // Wrapper output to fsm
   assign fsm_flit = fsm_data[NocDataWidth-1:0];
   assign fsm_flit_type = fsm_data[NocDataWidth+:flitTypeSize];
-    
+
+  // Tlast output forced when !KeepEnable and empty tail ( tail & flit == hff00_0000_0000_0000)
+  assign wait_tlast = (byte_counter == 3'b111) & (flit_type == BODY) & !fsm_valid & !KeepEnable;
+  assign empty_tail_tlast = (fsm_valid & fsm_flit_type == TAIL) & (fsm_flit == 64'hff00_0000_0000_0000);
 
   //----------------------------------------------------------------------------------------------
   // modules instantiation
@@ -187,7 +194,7 @@ module network_data_axis_downsizer #
       empty_buffer <= 1'b1;
       
 
-    end else if (fsm_valid & fsm_ready) begin
+    end else if (fsm_valid & fsm_ready & !empty_tail_tlast) begin
       empty_buffer <= 1'b0;
       flit <= fsm_flit;
       flit_type <= fsm_flit_type;
@@ -199,7 +206,7 @@ module network_data_axis_downsizer #
         tdest <= fsm_flit[tdest_addr+:tdest_size];
         // Determine the index of the last valid byte
         casez (fsm_flit[padd_addr_header+:padd_size_header])
-          4'b???1: padd_byte_index <= 0;
+          4'b???1: padd_byte_index <= 0; // Empty header
           4'b??10: padd_byte_index <= 1;
           4'b?100: padd_byte_index <= 2;
           4'b1000: padd_byte_index <= 3;                   
@@ -208,7 +215,7 @@ module network_data_axis_downsizer #
       end else if (fsm_flit_type == TAIL) begin
         // Determine the index of the last valid byte
         casez (fsm_flit[padd_addr_tail+:padd_size_tail])
-          7'b??????1: padd_byte_index <= 0;
+          7'b??????1: padd_byte_index <= 0; // Empty tail
           7'b?????10: padd_byte_index <= 1;
           7'b????100: padd_byte_index <= 2;
           7'b???1000: padd_byte_index <= 3;
@@ -222,7 +229,7 @@ module network_data_axis_downsizer #
       empty_buffer <= 1'b1;
     end 
   end
-
+ 
 
   //----------------------------------------------------------------------------------------------
   // Output signals
@@ -235,7 +242,7 @@ module network_data_axis_downsizer #
       tkeep <= 1'b0;
       
 
-    end else if (fsm_valid & fsm_ready) begin      
+    end else if (fsm_valid & fsm_ready & !empty_tail_tlast) begin      
       payload <= fsm_flit[0+:8];
       
       if (((fsm_flit_type == HEADER_TAIL) & fsm_flit[padd_addr_header]) |
@@ -249,7 +256,7 @@ module network_data_axis_downsizer #
         tkeep <= 1'b1;
       end
 
-    end else if (!empty_buffer & m_axis_tready) begin
+    end else if (!empty_buffer & m_axis_tready & !wait_tlast) begin
       payload <= flit[8*byte_counter +: 8];
       
       if (((flit_type == TAIL) | (flit_type == HEADER_TAIL)) & 
