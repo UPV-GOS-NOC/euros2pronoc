@@ -88,7 +88,7 @@ module noc_packet_creator #
   localparam BODY_TYPE        = 3'b001;
   localparam TAIL_TYPE        = 3'b010;
   localparam HEADTAIL_TYPE    = 3'b011;
-  localparam EMPTY_TAIL_TYPE  = 3'b111;
+  localparam EMPTY_TAIL_TYPE  = 3'b110;
   
 
   // fifo_type_1_async_axis_wrapper parameters
