@@ -110,7 +110,17 @@ module SWITCH_VC #(
   localparam [`AXIS_DIRECTION_WIDTH-1:0]  NodeIdIncreaseXAxis = `DIRECTION_EAST,                   //! Node ID increment direction in X axis  Supported values: EASTWARDS WESTWARDS
   localparam [`AXIS_DIRECTION_WIDTH-1:0]  NodeIdIncreaseYAxis = `DIRECTION_SOUTH,                  //! Node ID increment direction in Y axis. Supported values: NORTHWARDS SOUTHWARDS 
   localparam NUM_PORTS                  = 5,                                                       //! Number of ports
-    
+  localparam LBDRNumberOfBits           = (ROUTING_ALGORITHM_TYPE == "LBDR_2D") ? 12 :
+  //                                        (ROUTING_ALGORITHM_TYPE == "LBDR_3D") ? 36 :           // Rxy:24, Cxy:6 Txy:6
+                                          0,
+  localparam FileRegCommandIdWidth = Log2_w(`FILEREG_NUMBER_OF_COMMANDS), // Number of bits required to encode the command code. The module currently supports 2 commands: Read and Write
+  localparam FileRegDepth          = `FILEREG_NUMBER_OF_ENTRIES,
+  localparam FileRegEntryIdWidth   = Log2_w(FileRegDepth),
+  localparam FileRegEntryWidth     = `FILEREG_ENTRY_WIDTH,  // Size in bits for each entry of the Register File (paylad in tdata input port)
+  localparam OperationTDataWidth    = FileRegCommandIdWidth + FileRegEntryIdWidth + FileRegEntryWidth,
+  localparam SourceIdWidth          = GLBL_SWITCH_ID_w,
+  localparam RegisterReadWidth      = SourceIdWidth + FileRegEntryWidth,
+  //
   localparam VN_X_VC_w                  = Log2_w(NUM_VC * NUM_VN),                                 //! width for a VNxVC identifier
   localparam NUM_VN_X_VC                = NUM_VN * NUM_VC,                                         //! number of VNxVCs
   localparam VN_w                       = Log2_w(NUM_VN),                                          //! width for a VN identifier
@@ -186,6 +196,19 @@ module SWITCH_VC #(
   input [NUM_VN-1 : 0]         GoBitFromNI,         //! LOCAL interface: Stop&Go in
   //
   input [VN_WEIGHT_VECTOR_w-1:0] WeightsVector_in,  //! weight vector
+  //
+    input rst_i,
+  //
+  input                             filereg_m_tvalid_i,
+  input   [OperationTDataWidth-1:0] filereg_m_tdata_i,
+  input                             filereg_m_tlast_i,    //! port available but signal is not processed (safely ignored)
+  output                            filereg_m_tready_o,   //! module can accpet requests
+  //
+  input                             filereg_s_tready_i,
+  output                            filereg_s_tvalid_o,
+  output [RegisterReadWidth-1:0]    filereg_s_tdata_o,     //! register data and destination id to return the register data
+  output                            filereg_s_tlast_o,     //! always active, this module expects single frame streams
+  //
   output[31 : 0]                 debug_signals_o,   //! debug information from the switch
   input                          clk,               //! clock signal
   input                          rst_p              //! reset signal
@@ -200,7 +223,8 @@ module SWITCH_VC #(
    assign VN_ToNI = VC_ToNI / NUM_VC;
 
   genvar i;
-
+  genvar j;
+  
    generate
     for (i=0; i<NUM_VN_X_VC; i=i+1) begin : VN_X_VC
 
@@ -418,8 +442,7 @@ module SWITCH_VC #(
 
     end //end for
     endgenerate 
-
-    genvar j; 
+ 
     //Assigns the values to the respective signals only when the respective VC incoming is the same as the VC to which the signal belongs.
     generate 
     for(j=0; j<NUM_VN_X_VC;j = j+1) begin : signals_input_ports
@@ -460,6 +483,61 @@ module SWITCH_VC #(
 
     end 
   endgenerate
+  
+  //Internal connections for lbdr configuration between filereg and routing modules for each VC
+  //  LBDR configuration is per VN, this is, ALL VCs of a VN are assigned the same routing configuration 
+  wire [(LBDRNumberOfBits*NUM_VN)-1:0] filereg_lbdr_bits_bus;
+  // define wires for each routing module
+  generate
+    for (i=0; i<NUM_VN_X_VC; i=i+1) begin : LBDR_CONFIG_BUS_VN_X_VC
+      wire [LBDRNumberOfBits-1:0] lbdr_bits;
+    end
+  endgenerate
+  // assign same wires for all VCs of the same VN
+  generate
+    for (i=0; i<NUM_VN; i=i+1) begin : LBDR_CONFIG_BUS_PER_VN
+      for (j=0; j<NUM_VC; j=j+1) begin : LBDR_CONFIG_BUS_PER_VC
+        //Internal connections for lbdr configuration between filereg and routing modules for each VC
+        //  LBDR configuration is per VN, this is, ALL VCs of a VN are assigned the same routing configuration 
+         assign LBDR_CONFIG_BUS_VN_X_VC[(i*j)+j].lbdr_bits = filereg_lbdr_bits_bus[ (LBDRNumberOfBits*i)+:LBDRNumberOfBits];
+      end
+    end
+  endgenerate
+  
+  // Instantiate filereg module.
+  filereg #(
+    .NodeId            (ID),
+    .NodeIdWidth       (GLBL_SWITCH_ID_w),
+    .NodesInXDimension (GLBL_DIMX),
+    .NodesInYDimension (GLBL_DIMY), 
+    .DimensionXWidth   (GLBL_DIMX_w),
+    .DimensionYWidth   (GLBL_DIMY_w),
+    .NodeIdIncreaseXAxis (NodeIdIncreaseXAxis),
+    .NodeIdIncreaseYAxis (NodeIdIncreaseYAxis),
+    .LBDRNumberOfBits    (LBDRNumberOfBits),
+    .FileRegCommandIdWidth (FileRegCommandIdWidth),
+    .FileRegDepth          (FileRegDepth),
+    .FileRegEntryIdWidth   (FileRegEntryIdWidth),
+    .FileRegEntryWidth     (FileRegEntryWidth),
+    .NumberOfPorts       (NUM_PORTS),
+    .NumberOfVNs         (NUM_VN)
+  ) filereg_inst (
+   .clk_i  (clk),
+   .rst_i  (rst_p),
+   //
+   .filereg_m_tvalid_i (filereg_m_tvalid_i),
+   .filereg_m_tdata_i  (filereg_m_tdata_i),
+   .filereg_m_tlast_i  (filereg_m_tlast_i),    //! port available but signal is not processed (safely ignored)
+   .filereg_m_tready_o (filereg_m_tready_o),   //! module can accpet requests
+   //
+   .filereg_s_tready_i (filereg_s_tready_i),
+   .filereg_s_tvalid_o (filereg_s_tvalid_o),
+   .filereg_s_tdata_o  (filereg_s_tdata_o),     //! register data and destination id to return the register data
+   .filereg_s_tlast_o  (filereg_s_tlast_o),      //! always active, this module expects single frame streams 
+   //
+   .lbdr_bits_bus_o (filereg_lbdr_bits_bus)   //! lbdr configuration bits. All bits of all VNs
+  );
+  
   
   generate
     for (i=0; i<NUM_VN_X_VC; i=i+1) begin : input_buffers_and_routings
@@ -604,7 +682,8 @@ module SWITCH_VC #(
     .PORT                          ( `PORT_E                           )
   ) ROUTING_EAST (
     .clk                           ( clk                                                            ),
-    .rst_p                         ( rst_p                                                          ), 
+    .rst_p                         ( rst_p                                                          ),
+    .lbdr_bits_i                   ( LBDR_CONFIG_BUS_VN_X_VC[i].lbdr_bits                           ), 
     .Req                           ( VN_X_VC[i].REQ__FROM__IU_E__TO__RT_E                           ),
     .Flit                          ( VN_X_VC[i].FLIT__FROM__IU_E__TO__RT_E[FLIT_SIZE-1:0]           ), 
     .FlitType                      ( VN_X_VC[i].FLITTYPE__FROM__IU_E__TO__RT_E[FLIT_TYPE_SIZE-1:0]  ),
@@ -664,7 +743,8 @@ module SWITCH_VC #(
     .PORT                          ( `PORT_L                           )
   ) ROUTING_LOCAL (
     .clk                           ( clk                                                            ),
-    .rst_p                         ( rst_p                                                          ),  
+    .rst_p                         ( rst_p                                                          ),
+    .lbdr_bits_i                   ( LBDR_CONFIG_BUS_VN_X_VC[i].lbdr_bits                           ),  
     .Req                           ( VN_X_VC[i].REQ__FROM__IU_L__TO__RT_L                           ),
     .Flit                          ( VN_X_VC[i].FLIT__FROM__IU_L__TO__RT_L[FLIT_SIZE-1:0]           ), 
     .FlitType                      ( VN_X_VC[i].FLITTYPE__FROM__IU_L__TO__RT_L[FLIT_TYPE_SIZE-1:0]  ),
@@ -725,6 +805,7 @@ module SWITCH_VC #(
   ) ROUTING_NORTH (
     .clk                           ( clk                                                            ),
     .rst_p                         ( rst_p                                                          ),
+    .lbdr_bits_i                   ( LBDR_CONFIG_BUS_VN_X_VC[i].lbdr_bits                           ),
     .Req                           ( VN_X_VC[i].REQ__FROM__IU_N__TO__RT_N                           ),
     .Flit                          ( VN_X_VC[i].FLIT__FROM__IU_N__TO__RT_N[FLIT_SIZE-1:0]           ), 
     .FlitType                      ( VN_X_VC[i].FLITTYPE__FROM__IU_N__TO__RT_N[FLIT_TYPE_SIZE-1:0]  ),
@@ -785,7 +866,8 @@ module SWITCH_VC #(
     .PORT                          ( `PORT_S                           )
   ) ROUTING_SOUTH (
     .clk                           ( clk                                                            ),
-    .rst_p                         ( rst_p                                                          ),  
+    .rst_p                         ( rst_p                                                          ),
+    .lbdr_bits_i                   ( LBDR_CONFIG_BUS_VN_X_VC[i].lbdr_bits                           ),  
     .Req                           ( VN_X_VC[i].REQ__FROM__IU_S__TO__RT_S                           ),
     .Flit                          ( VN_X_VC[i].FLIT__FROM__IU_S__TO__RT_S[FLIT_SIZE-1:0]           ), 
     .FlitType                      ( VN_X_VC[i].FLITTYPE__FROM__IU_S__TO__RT_S[FLIT_TYPE_SIZE-1:0]  ),
@@ -845,7 +927,8 @@ module SWITCH_VC #(
     .PORT                          ( `PORT_W                           )
   ) ROUTING_WEST  (
     .clk                           ( clk                                                            ),
-    .rst_p                         ( rst_p                                                          ),  
+    .rst_p                         ( rst_p                                                          ),
+    .lbdr_bits_i                   ( LBDR_CONFIG_BUS_VN_X_VC[i].lbdr_bits                           ),  
     .Req                           ( VN_X_VC[i].REQ__FROM__IU_W__TO__RT_W                           ),
     .Flit                          ( VN_X_VC[i].FLIT__FROM__IU_W__TO__RT_W[FLIT_SIZE-1:0]           ), 
     .FlitType                      ( VN_X_VC[i].FLITTYPE__FROM__IU_W__TO__RT_W[FLIT_TYPE_SIZE-1:0]  ),
