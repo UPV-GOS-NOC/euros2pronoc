@@ -137,15 +137,15 @@ module tb_filereg;
    .clk_i  (clk),
    .rst_i  (rst),
    //
-   .operation_tvalid_i (operation_tvalid),
-   .operation_tdata_i  (operation_tdata),
-   .operation_tlast_i  (operation_tlast),    //! port available but signal is not processed (safely ignored)
-   .operation_tready_o (operation_tready),   //! module can accpet requests
+   .filereg_m_tvalid_i (operation_tvalid),
+   .filereg_m_tdata_i  (operation_tdata),
+   .filereg_m_tlast_i  (operation_tlast),    //! port available but signal is not processed (safely ignored)
+   .filereg_m_tready_o (operation_tready),   //! module can accpet requests
    //
-   .register_tready_i (register_tready),
-   .register_tvalid_o (register_tvalid),
-   .register_tdata_o  (register_tdata),     //! register data and destination id to return the register data
-   .register_tlast_o  (register_tlast),      //! always active, this module expects single frame streams 
+   .filereg_s_tready_i (register_tready),
+   .filereg_s_tvalid_o (register_tvalid),
+   .filereg_s_tdata_o  (register_tdata),     //! register data and destination id to return the register data
+   .filereg_s_tlast_o  (register_tlast),      //! always active, this module expects single frame streams 
    //
    .lbdr_bits_bus_o (lbdr_bits_bus)   //! lbdr configuration bits. All bits of all VNs
   );

@@ -75,10 +75,12 @@ module filereg #(
   parameter [`AXIS_DIRECTION_WIDTH-1:0]  NodeIdIncreaseYAxis = `DIRECTION_NORTH,  //! Node ID increment direction in Y axis. Supported values: NORTHWARDS SOUTHWARDS 
   parameter integer LBDRNumberOfBits = 0,
   //
-  //parameter FileRegDepth           = `FILEREG_NUMBER_OF_ENTRIES,  // Number of entries in File Register. Must be power of two, otherwise the value will be the next power of two value
-  //parameter FileRegCommandIdWidth  = num_bits(`FILEREG_NUMBER_OF_COMMANDS),  // number of bits required to represent the file register entry
-  //parameter FileRegEntryWidth      = `FILEREG_ENTRY_WIDTH,  // Size in bits for each entry of the Register File (paylad in tdata input port)
-  //
+  parameter FileRegCommandIdWidth = num_bits(`FILEREG_NUMBER_OF_COMMANDS - 1), // Number of bits required to encode the command code. The module currently supports 2 commands: Read and Write
+  parameter FileRegDepth          = `FILEREG_NUMBER_OF_ENTRIES,
+  parameter FileRegEntryIdWidth   = num_bits(FileRegDepth-1),
+  parameter FileRegEntryWidth     = `FILEREG_ENTRY_WIDTH,  // Size in bits for each entry of the Register File (paylad in tdata input port)
+
+
   parameter integer NumberOfPorts = 0,  //! number of ports in the router N-E-W-S-L
   parameter integer NumberOfVNs   = 1,
   //
@@ -89,10 +91,10 @@ module filereg #(
   localparam NumberOfColumns              = NodesInXDimension,
   localparam NumberOfRows                 = NodesInYDimension,
   //
-  localparam FileRegCommandIdWidth = num_bits(`FILEREG_NUMBER_OF_COMMANDS - 1), // Number of bits required to encode the command code. The module currently supports 2 commands: Read and Write
-  localparam FileRegDepth          = `FILEREG_NUMBER_OF_ENTRIES,
-  localparam FileRegEntryIdWidth   = num_bits(FileRegDepth-1),
-  localparam FileRegEntryWidth     = `FILEREG_ENTRY_WIDTH,  // Size in bits for each entry of the Register File (paylad in tdata input port)
+  //localparam FileRegCommandIdWidth = num_bits(`FILEREG_NUMBER_OF_COMMANDS - 1), // Number of bits required to encode the command code. The module currently supports 2 commands: Read and Write
+  //localparam FileRegDepth          = `FILEREG_NUMBER_OF_ENTRIES,
+  //localparam FileRegEntryIdWidth   = num_bits(FileRegDepth-1),
+  //localparam FileRegEntryWidth     = `FILEREG_ENTRY_WIDTH,  // Size in bits for each entry of the Register File (paylad in tdata input port)
   
   localparam current_data_lsb      = 0,
   localparam current_data_msb      = current_data_lsb + FileRegEntryWidth - 1,
@@ -108,15 +110,15 @@ module filereg #(
   input clk_i,
   input rst_i,
   //
-  input                             operation_tvalid_i,
-  input   [OperationTDataWidth-1:0] operation_tdata_i,
-  input                             operation_tlast_i,    //! port available but signal is not processed (safely ignored)
-  output                            operation_tready_o,   //! module can accpet requests
+  input                             filereg_m_tvalid_i,
+  input   [OperationTDataWidth-1:0] filereg_m_tdata_i,
+  input                             filereg_m_tlast_i,    //! port available but signal is not processed (safely ignored)
+  output                            filereg_m_tready_o,   //! module can accpet requests
   //
-  input                             register_tready_i,
-  output                            register_tvalid_o,
-  output [RegisterReadWidth-1:0]    register_tdata_o,     //! register data and destination id to return the register data
-  output                            register_tlast_o,     //! always active, this module expects single frame streams
+  input                             filereg_s_tready_i,
+  output                            filereg_s_tvalid_o,
+  output [RegisterReadWidth-1:0]    filereg_s_tdata_o,     //! register data and destination id to return the register data
+  output                            filereg_s_tlast_o,     //! always active, this module expects single frame streams
   // 
   output  [LBDRBitsPortWidth-1:0]   lbdr_bits_bus_o    //! lbdr configuration bits. All bits of all VNs
   // stats input: flits crossing the ports flag
@@ -126,8 +128,8 @@ module filereg #(
   // tlast ports currently not processed
   // input is ignored
   // output is always set to one
-  assign register_tlast_o = 1'b1;
-  assign register_tdata_o = tdata_r;
+  assign filereg_s_tlast_o = 1'b1;
+  assign filereg_s_tdata_o = tdata_r;
   
   // --------------------------------------------------------------------------
   // Functions Definition
@@ -259,9 +261,9 @@ module filereg #(
   wire [FileRegEntryIdWidth-1:0]   current_operation_entry_id_w;
   wire [FileRegEntryWidth-1:0]     current_operation_data_w;
 
-  assign current_operation_command_w   =  operation_tdata_i[current_operation_msb:current_operation_lsb];
-  assign current_operation_entry_id_w  =  operation_tdata_i[current_entry_id_msb:current_entry_id_lsb];
-  assign current_operation_data_w      =  operation_tdata_i[current_data_msb:current_data_lsb];
+  assign current_operation_command_w   =  filereg_m_tdata_i[current_operation_msb:current_operation_lsb];
+  assign current_operation_entry_id_w  =  filereg_m_tdata_i[current_entry_id_msb:current_entry_id_lsb];
+  assign current_operation_data_w      =  filereg_m_tdata_i[current_data_msb:current_data_lsb];
 
   localparam FSM_STATE_IDLE    = 2'b00;
   localparam FSM_STATE_BUSY    = 2'b01; // processing operation 
@@ -284,7 +286,7 @@ module filereg #(
   // update received command and data when system is not stalled or always ??
   // when system is stalled AXI specifies that sender must keep data values 
   always @(posedge clk_i) begin
-    //if (operation_tready_o) begin
+    //if (filereg_m_tready_o) begin
       current_operation_command   =  current_operation_command_w;
       current_operation_entry_id  =  current_operation_entry_id_w; 
       current_operation_data      =  current_operation_data_w;
@@ -321,7 +323,7 @@ module filereg #(
 
     case (fsm_operation_current_state)
       FSM_STATE_IDLE: begin
-        if(operation_tvalid_i) begin
+        if(filereg_m_tvalid_i) begin
           fsm_operation_next_state = FSM_STATE_BUSY;
         end else begin
           fsm_operation_next_state = FSM_STATE_IDLE;
@@ -329,16 +331,16 @@ module filereg #(
       end
 
       FSM_STATE_BUSY: begin
-        if (register_tready_i) begin
-          if (operation_tvalid_i) begin
+        if (filereg_s_tready_i) begin
+          if (filereg_m_tvalid_i) begin
             fsm_operation_next_state = FSM_STATE_BUSY;
           end else begin
              fsm_operation_next_state = FSM_STATE_IDLE;
           end
-        end else begin // register_tready_i = 0  --> next module cannot accept data
-          if(operation_tvalid_i && (current_operation_command_w == `FILEREG_COMMAND_WRITE)) begin
+        end else begin // filereg_s_tready_i = 0  --> next module cannot accept data
+          if(filereg_m_tvalid_i && (current_operation_command_w == `FILEREG_COMMAND_WRITE)) begin
             fsm_operation_next_state = FSM_STATE_BUSY;
-          end else if (operation_tvalid_i && (current_operation_command_w == `FILEREG_COMMAND_READ)) begin
+          end else if (filereg_m_tvalid_i && (current_operation_command_w == `FILEREG_COMMAND_READ)) begin
             fsm_operation_next_state = FSM_STATE_STALLED;
           end else begin
             // operation_valid_i = 0  or unknown command (not processing it)
@@ -349,7 +351,7 @@ module filereg #(
 
       FSM_STATE_STALLED: begin
         // read operation pending to return data to next module, but it cannot accpet data
-        if (register_tready_i) begin
+        if (filereg_s_tready_i) begin
             fsm_operation_next_state = FSM_STATE_BUSY;
         end else begin
              fsm_operation_next_state = FSM_STATE_STALLED;
@@ -362,9 +364,9 @@ module filereg #(
     endcase
   end
 
-  assign operation_tready_o =     (fsm_operation_current_state == FSM_STATE_IDLE)
+  assign filereg_m_tready_o =     (fsm_operation_current_state == FSM_STATE_IDLE)
                               || ((fsm_operation_current_state == FSM_STATE_BUSY) && (current_operation_command_w == `FILEREG_COMMAND_WRITE))
-                              || ((fsm_operation_current_state == FSM_STATE_BUSY) && (current_operation_command_w == `FILEREG_COMMAND_READ) && register_tready_i);
+                              || ((fsm_operation_current_state == FSM_STATE_BUSY) && (current_operation_command_w == `FILEREG_COMMAND_READ) && filereg_s_tready_i);
 
   //
   // Reset logic and write registers logic
@@ -381,7 +383,7 @@ module filereg #(
         end
       end
     end else begin
-      if (operation_tvalid_i && operation_tready_o) begin
+      if (filereg_m_tvalid_i && filereg_m_tready_o) begin
         if (current_operation_command == `FILEREG_COMMAND_WRITE) begin
           FileRegisterArray[current_operation_entry_id] <= current_operation_data;
         end
@@ -403,8 +405,8 @@ module filereg #(
   reg [RegisterReadWidth-1:0]      tdata_r; // registered copy of data out
  
   // JM10 debugging
-  wire cmd_is_read  = operation_tvalid_i && (current_operation_command_w == `FILEREG_COMMAND_READ);
-  wire cmd_is_write = operation_tvalid_i && (current_operation_command_w == `FILEREG_COMMAND_WRITE);
+  wire cmd_is_read  = filereg_m_tvalid_i && (current_operation_command_w == `FILEREG_COMMAND_READ);
+  wire cmd_is_write = filereg_m_tvalid_i && (current_operation_command_w == `FILEREG_COMMAND_WRITE);
   // JM10 debugging - end of block
   
   always @(posedge clk_i) begin
@@ -419,7 +421,7 @@ module filereg #(
     fsm_register_next_state = fsm_register_current_state;
     case (fsm_register_current_state)
       FSM_REGISTER_STATE_IDLE: begin
-        if(operation_tvalid_i && (current_operation_command_w == `FILEREG_COMMAND_READ) ) begin
+        if(filereg_m_tvalid_i && (current_operation_command_w == `FILEREG_COMMAND_READ) ) begin
           fsm_register_next_state = FSM_REGISTER_STATE_DATA_UPDATE;
         end else begin
           fsm_register_next_state = FSM_REGISTER_STATE_IDLE;
@@ -427,21 +429,21 @@ module filereg #(
       end
 
       FSM_REGISTER_STATE_DATA_UPDATE: begin
-        if (register_tready_i) begin
-          if (operation_tvalid_i  && (current_operation_command_w == `FILEREG_COMMAND_READ)) begin
+        if (filereg_s_tready_i) begin
+          if (filereg_m_tvalid_i  && (current_operation_command_w == `FILEREG_COMMAND_READ)) begin
             fsm_register_next_state = FSM_REGISTER_STATE_DATA_UPDATE;
           end else begin
             fsm_register_next_state = FSM_REGISTER_STATE_IDLE;
           end
-        end else begin // register_tready_i = 0  --> next module cannot accept data
+        end else begin // filereg_s_tready_i = 0  --> next module cannot accept data
           fsm_register_next_state = FSM_REGISTER_STATE_STALLED;
         end
       end
 
       FSM_REGISTER_STATE_STALLED: begin
         // read operation pending to return data to next module, but it cannot accpet data
-        if (register_tready_i) begin
-          if (operation_tvalid_i  && (current_operation_command_w == `FILEREG_COMMAND_READ)) begin
+        if (filereg_s_tready_i) begin
+          if (filereg_m_tvalid_i  && (current_operation_command_w == `FILEREG_COMMAND_READ)) begin
             fsm_register_next_state = FSM_REGISTER_STATE_DATA_UPDATE;
           end else begin
             fsm_register_next_state = FSM_REGISTER_STATE_IDLE;
@@ -457,7 +459,7 @@ module filereg #(
     endcase
   end
   
-  assign register_tvalid_o  =  (fsm_register_current_state == FSM_REGISTER_STATE_DATA_UPDATE)
+  assign filereg_s_tvalid_o  =  (fsm_register_current_state == FSM_REGISTER_STATE_DATA_UPDATE)
                             || (fsm_register_current_state == FSM_REGISTER_STATE_STALLED);
 
 
