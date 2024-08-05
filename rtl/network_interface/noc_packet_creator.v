@@ -32,7 +32,7 @@ module noc_packet_creator #
   parameter integer MaxPacketsEnable = 0,
   parameter integer MaxPackets = 20,
   parameter integer NocBroadcastWidth = 1,
-  parameter integer source_id = 11'b00000000001,
+  parameter integer source_id = 0,
   parameter integer NocVirtualChannelIdWidth = 3,
 
   //localparam integer NumVnXVcWw = num_bits(NumVn*NumVc),
@@ -174,9 +174,9 @@ module noc_packet_creator #
   assign fsm_flit_type = stored_flit_to_send ? flit_type_out : flit_type[1:0];
   assign fsm_flit = stored_flit_to_send ? flit_out : 
                     ((flit_type == HEADER_TYPE)|(flit_type == HEADTAIL_TYPE)) ? 
-                    {header, tid, last, padd[3:0], byte_buffer[31:0]} :
+                    {header, tid[4:0], last, padd[PaddWidthHeader-1:0], byte_buffer[31:0]} :
                     (((flit_type == BODY_TYPE) & KeepEnable) | (flit_type == TAIL_TYPE)) ? 
-                    {last, padd, byte_buffer[55:0]} :
+                    {last, padd[PaddWidthTail-1:0], byte_buffer[55:0]} :
                     ((flit_type == BODY_TYPE) & !KeepEnable) ? byte_buffer :
                     {last, {PaddWidthTail{1'b1}}, {NocDataWidth-8{1'b0}}};
   assign fsm_broadcast = 1'b0;
@@ -203,7 +203,7 @@ module noc_packet_creator #
       header <= {SrcDstWidth{1'b0}};
     end else if (s_axis_tvalid & (state != EMPTY_TAIL)) begin
       tid <= s_axis_tid;
-      header <= {s_axis_tdest, source_id};
+      header <= {s_axis_tdest, source_id[10:0]};
       last <= s_axis_tlast;
       
       //Cleaning registers 
@@ -244,15 +244,15 @@ module noc_packet_creator #
       stored_flit_to_send <= 1'b1;
       flit_type_out <= flit_type[1:0];
       if ((flit_type == HEADER_TYPE) | (flit_type == HEADTAIL_TYPE)) begin
-        flit_out <= {header, tid, last, padd[PaddWidthHeader-1:0], byte_buffer[31:0]};
+        flit_out <= {header, tid[4:0], last, padd[PaddWidthHeader-1:0], byte_buffer[31:0]};
         flit_type_out <= flit_type[1:0];
       end else if (flit_type == BODY_TYPE) begin
         if (KeepEnable) 
-          flit_out <= {1'b0, padd, byte_buffer[55:0]};
+          flit_out <= {1'b0, padd[PaddWidthTail-1:0], byte_buffer[55:0]};
         else 
           flit_out <= byte_buffer;
       end else if (flit_type == TAIL_TYPE) begin
-        flit_out <= {last, padd, byte_buffer[55:0]};
+        flit_out <= {last, padd[PaddWidthTail-1:0], byte_buffer[55:0]};
       end else if (flit_type == EMPTY_TAIL_TYPE) begin
         flit_out <= {last, {PaddWidthTail{1'b1}}, {NocDataWidth-8{1'b0}}};
       end  
