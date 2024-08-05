@@ -203,6 +203,13 @@ module single_unit_network_interface #(
         .network_broadcast_o         (network_broadcast),
         .network_virtual_channel_id_o(network_virtual_channel_id)
       );
+    end else begin
+      assign s_axis_tready   = 1'b1;  // perfect sink, although it is an invalid path actually
+      assign axi2noc_valid   = 1'b0;
+      assign network_flit    = {NetworkIfFlitWidth{1'b0}};
+      assign network_flit_type = {NetworkIfFlitTypeWidth{1'b0}};
+      assign network_broadcast = {NetworkIfBroadcastWidth{1'b0}};
+      assign network_virtual_channel_id = {NetworkIfVirtualChannelIdWidth{1'b0}};
     end
   endgenerate
 
@@ -239,6 +246,13 @@ module single_unit_network_interface #(
         .network_ready_o(data_from_network_ready),
         .network_data_i (data_from_network)
       );
+    end else begin
+      assign data_from_network_ready = 1'b1;  // perfect sink, although is an invalid path actually
+      assign m_axis_tvalid = 1'b0;
+      assign m_axis_tlast  = 1'b0;
+      assign m_axis_tdata  = {AxiStreamInitiatorIfTDataWidth{1'b0}};
+      assign m_axis_tid    = {AxiStreamInitiatorIfTIdWidth{1'b0}};
+      assign m_axis_tdest  = {AxiStreamInitiatorIfTDestWidth{1'b0}};
     end
   endgenerate
 
