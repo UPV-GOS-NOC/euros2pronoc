@@ -42,7 +42,7 @@
 
 `include "macro_functions.h"
 `include "net_common.h"
-`include "routing_lbdr_2d.h"
+`include "routing_algorithm_lbdr_2d.h"
 
 //! Routing module with VC and VN support. This module performs the routing of the switch. A routing module is instantiated on every input queue 
 //! of a switch's input port. Each VC of each VN has its own ROUTING_VC module (and its own IBUFFER module). 
@@ -79,7 +79,7 @@ module ROUTING_VC #(
   parameter ROUTING_ALGORITHM_TYPE = "XY",      //! Algorithm for routing, supported types are: LBDR_2D, XY (default)
   parameter [`AXIS_DIRECTION_WIDTH-1:0]  NodeIdIncreaseXAxis = `DIRECTION_EAST,   //! Node ID increment direction in X axis  Supported values: EASTWARDS WESTWARDS
   parameter [`AXIS_DIRECTION_WIDTH-1:0]  NodeIdIncreaseYAxis = `DIRECTION_NORTH,   //! Node ID increment direction in Y axis. Supported values: NORTHWARDS SOUTHWARDS
-  parameter integer NumberOfLBDRBits  = 0, 
+  localparam integer NumberOfLBDRBits  = ROUTING_ALGORITHM_TYPE == "LBDR_2D" ? `LBDR_2D_NUM_BITS : 12, 
   parameter NUM_PORTS          = `NUM_PORTS,
   parameter PORT               = 0,             //! Port identifier (can be PORT_N, PORT_E, PORT_W, PORT_S, PORT_L)
   parameter FLIT_SIZE          = 64,            //! flit size in bits
@@ -213,8 +213,7 @@ localparam ID_SIZE = GLBL_SWITCH_ID_w;                  //! ID width
           .NodeIdIncreaseXAxis (NodeIdIncreaseXAxis),
           .NodeIdIncreaseYAxis (NodeIdIncreaseYAxis),
           .NumberOfLBDRBits (NumberOfLBDRBits),
-          .NumberOfPorts    (`NUM_PORTS), //! number of ports in the router N-E-W-S-L
-          .NumberOfLBDRBits (`LBDR_2D_NUM_BITS)
+          .NumberOfPorts    (`NUM_PORTS) //! number of ports in the router N-E-W-S-L
         ) routing_algorithm_lbdr_2d_inst (
           .x_cur_i   (x_cur),
           .y_cur_i   (y_cur),
