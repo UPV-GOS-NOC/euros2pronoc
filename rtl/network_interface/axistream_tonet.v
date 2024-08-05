@@ -150,10 +150,10 @@ module axistream_tonet #(
     .s_axis_tlast  (targetif_tlast),
     .s_axis_tid    (targetif_tid),
     .s_axis_tdest  (targetif_tdest),
-    .s_axis_tkeep  (0),
-    .s_axis_tstrb  (0),
-    .s_axis_tuser  (0),
-    .s_axis_twakeup(0),
+    .s_axis_tkeep  (4'b0),
+    .s_axis_tstrb  (4'b00),
+    .s_axis_tuser  (4'b0),
+    .s_axis_twakeup(1'b0),
     
     
     .m_axis_tdata  (signal_homogeneizator_tdata),
@@ -234,10 +234,10 @@ module axistream_tonet #(
     .s_axis_tlast  (downsizer_tlast),
     .s_axis_tid    (downsizer_tid),
     .s_axis_tdest  (downsizer_tdest),
-    .s_axis_tkeep  (0),
-    .s_axis_tstrb  (0),
-    .s_axis_user   (0),
-    .s_axis_twakeup(0),
+    .s_axis_tkeep  (1'b0),
+    .s_axis_tstrb  (1'b0),
+    .s_axis_user   (1'b0),
+    .s_axis_twakeup(1'b0),
     
     
     .network_flit_o     (network_flit),
