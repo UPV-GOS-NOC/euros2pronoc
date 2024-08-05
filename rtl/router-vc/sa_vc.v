@@ -301,7 +301,7 @@ generate
     end                                        
 
     //wire [NUM_VN_X_VC_AND_PORTS-1:0] grants_in;           //Grants incomming from Arbiter
-    wire [bits_VN_X_VC_AND_PORTS-1:0] grants_in_id;         //Position of incomming grant    
+    //wire [bits_VN_X_VC_AND_PORTS-1:0] grants_in_id;         //Position of incomming grant    
     wire [NUM_VN_X_VC_AND_PORTS-1:0] GRANTS_IN_RR = ( (|vector_in) /*& (|Channels_preselected)*//*grants_in_not_zeros*/) ? grants_in : `V_ZERO(NUM_VN_X_VC_AND_PORTS);
 
     RR_X_IN #(
