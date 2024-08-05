@@ -106,13 +106,13 @@ module SWITCH_VC #(
   parameter ENABLE_VN_WEIGHTS_SUPPORT = "yes",       //! Enable for weighted arbiters (to provide bandwidth guarantees to each VN)
   parameter VN_WEIGHT_VECTOR_w = 20,                //! width of the weight vector in bits
   //
-  localparam ROUTING_ALGORITHM_TYPE     = "XY",                                                    //! routing algoritm type,
+  localparam ROUTING_ALGORITHM_TYPE     = "LBDR_2D", // "LBDR_2D",                                                    //! routing algoritm type,
   localparam [`AXIS_DIRECTION_WIDTH-1:0]  NodeIdIncreaseXAxis = `DIRECTION_EAST,                   //! Node ID increment direction in X axis  Supported values: EASTWARDS WESTWARDS
   localparam [`AXIS_DIRECTION_WIDTH-1:0]  NodeIdIncreaseYAxis = `DIRECTION_SOUTH,                  //! Node ID increment direction in Y axis. Supported values: NORTHWARDS SOUTHWARDS 
   localparam NUM_PORTS                  = 5,                                                       //! Number of ports
   localparam LBDRNumberOfBits           = (ROUTING_ALGORITHM_TYPE == "LBDR_2D") ? 12 :
   //                                        (ROUTING_ALGORITHM_TYPE == "LBDR_3D") ? 36 :           // Rxy:24, Cxy:6 Txy:6
-                                          0,
+                                          12,
   localparam FileRegCommandIdWidth = Log2_w(`FILEREG_NUMBER_OF_COMMANDS), // Number of bits required to encode the command code. The module currently supports 2 commands: Read and Write
   localparam FileRegDepth          = `FILEREG_NUMBER_OF_ENTRIES,
   localparam FileRegEntryIdWidth   = Log2_w(FileRegDepth),
@@ -196,9 +196,7 @@ module SWITCH_VC #(
   input [NUM_VN-1 : 0]         GoBitFromNI,         //! LOCAL interface: Stop&Go in
   //
   input [VN_WEIGHT_VECTOR_w-1:0] WeightsVector_in,  //! weight vector
-  //
-    input rst_i,
-  //
+
   input                             filereg_m_tvalid_i,
   input   [OperationTDataWidth-1:0] filereg_m_tdata_i,
   input                             filereg_m_tlast_i,    //! port available but signal is not processed (safely ignored)
@@ -499,7 +497,7 @@ module SWITCH_VC #(
       for (j=0; j<NUM_VC; j=j+1) begin : LBDR_CONFIG_BUS_PER_VC
         //Internal connections for lbdr configuration between filereg and routing modules for each VC
         //  LBDR configuration is per VN, this is, ALL VCs of a VN are assigned the same routing configuration 
-         assign LBDR_CONFIG_BUS_VN_X_VC[(i*j)+j].lbdr_bits = filereg_lbdr_bits_bus[ (LBDRNumberOfBits*i)+:LBDRNumberOfBits];
+         assign LBDR_CONFIG_BUS_VN_X_VC[(i*NUM_VC)+j].lbdr_bits = filereg_lbdr_bits_bus[ (LBDRNumberOfBits*i)+:LBDRNumberOfBits];
       end
     end
   endgenerate
