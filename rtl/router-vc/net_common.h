@@ -71,10 +71,10 @@
 // * Flit types
 //
 //**************************************************************************** 
-`define payload                 2'd0        // Flit type: payload      
-`define tail                    2'd1        // Flit type: tail          
-`define header_tail             2'd2        // Flit type: header_tail (single flit message)
-`define header                  2'd3        // Flit type: header
+`define payload                 2'd1  //2'd0        // Flit type: payload      
+`define tail                    2'd2  //2'd1        // Flit type: tail          
+`define header_tail             2'd3 //2'd2        // Flit type: header_tail (single flit message)
+`define header                  2'd0  //2'd3        // Flit type: header
 
 
 `endif // header file
