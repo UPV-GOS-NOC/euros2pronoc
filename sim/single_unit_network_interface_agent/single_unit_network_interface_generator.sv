@@ -118,7 +118,10 @@ class single_unit_network_interface_generator;
     // First, create the ready transaction with the most random policy 
     // TODO try different policies
     axi4stream_ready_gen item = m_axis_subordinate_agent.driver.create_ready("axis_subordinate_ready_gen_transaction");
-    item.set_ready_policy(XIL_AXI4STREAM_READY_GEN_RANDOM); 
+    item.set_ready_policy(XIL_AXI4STREAM_READY_GEN_RANDOM);
+    //item.set_ready_policy(XIL_AXI4STREAM_READY_GEN_NO_BACKPRESSURE);
+    //item.set_ready_policy(XIL_AXI4STREAM_READY_GEN_SINGLE);
+    //item.set_ready_policy(XIL_AXI4STREAM_READY_GEN_OSC); 
     m_axis_subordinate_driver_mbx.put(item);
   endtask
   

@@ -44,7 +44,9 @@ program single_unit_network_interface_base_test
     
     env = new(network_manager_if, network_subordinate_if, m_axis_vip_if, s_axis_vip_if);
     env.generator.total_transactions = 10000;
-    env.driver.verbosity = 0; // 1 for full verbosity
+    //env.m_axis_manager_agent.set_verbosity(400);
+    //env.m_axis_subordinate_agent.set_verbosity(400);
+    //env.driver.verbosity = 1; // for full verbosity
     $display("[T=%0t] [Test] Full tonet path verification", $time);
     env.generator.set_axis_manager_mode();
     env.m_axis_manager_agent.start_master();
