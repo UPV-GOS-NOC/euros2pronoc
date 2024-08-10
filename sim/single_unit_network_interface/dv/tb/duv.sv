@@ -1,24 +1,17 @@
-`timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date: 07/24/2024 04:53:00 PM
-// Design Name: 
-// Module Name: duv
-// Project Name: 
-// Target Devices: 
-// Tool Versions: 
-// Description: 
-// 
-// Dependencies: 
-// 
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
-//////////////////////////////////////////////////////////////////////////////////
+// SPDX-FileCopyrightText: (c) 2024  Parallel Architectures Group (GAP) <carherlu@upv.edu.es>
+// SPDX-License-Identifier: MIT
+//
+//
+// @file duv.sv
+// @author Rafael Tornero (ratorga@disca.upv.es)
+// @date March 05th, 2024
+//
+// @title Design for Single Unit Network Interface Verification
+//
+// The design does not provide the filereg access interface,
+// So the simulation environment uses Virtual Network 0 as data network
 
+`timescale 1ns / 1ps
 
 module duv #(
   parameter integer NetworkIfAddressId               = 0,  // Network configuration. Address identifier for this network interface
@@ -124,7 +117,13 @@ module duv #(
     .AxiStreamInitiatorIfEnable    (AxiStreamTargetIfEnable),
     .AxiStreamInitiatorIfTDataWidth(AxiStreamTargetIfTDataWidth),
     .AxiStreamInitiatorIfTIdWidth  (AxiStreamTargetIfTIdWidth),
-    .AxiStreamInitiatorIfTDestWidth(AxiStreamTargetIfTDestWidth)
+    .AxiStreamInitiatorIfTDestWidth(AxiStreamTargetIfTDestWidth),
+
+    .FileRegInitiatorIfEnable    (0),
+    .FileRegInitiatorIfTDataWidth(1),
+
+    .FileRegTargetIfEnable    (0),
+    .FileRegTargetIfTDataWidth(1)
   ) suni_inst (
      // clocks and resets
     .clk_s_axis_i   (clk_m_axis_i),
@@ -139,6 +138,17 @@ module duv #(
     .rst_upsizer_i  (rst_upsizer_i),
     .rst_downsizer_i(rst_downsizer_i),
   
+    // Configuration and monitoring file register access interface
+    .filereg_s_tvalid_i(1'b0),
+    .filereg_s_tready_o(),
+    .filereg_s_tdata_i (0),
+    .filereg_s_tlast_i (0),
+    //
+    .filereg_m_tvalid_o(),
+    .filereg_m_tready_i(1'b1),
+    .filereg_m_tdata_o (),
+    .filereg_m_tlast_o (),
+
     // AXI-Stream (Target) interface to connect an AXI-Stream initiator unit
     .s_axis_tvalid_i(m_axis_tvalid),
     .s_axis_tready_o(m_axis_tready),

@@ -40,6 +40,18 @@
 // the receiving end is prepared to accept it,
 // preventing data loss and improving overall system efficiency.
 //
+// In addition to application interfaces, the NI provides
+// a control and status register file interface, which could
+// be used for accessing certain configuration address spaces.
+// This interface is known as FileReg. It uses two given virtual
+// networks for routing control and status messages (usually VN0 for requests
+// and VN1 for responses). The request and response interfaces can be
+// enabled and disabled independently. In case of disabling an interface, 
+// the corresponding virtual network would be used for routing data
+// packets, instead of routing control and status packets. 
+// Anyway, it does not make sense (although it is possible) 
+// to enable only the response interface when the request one is disabled.
+// 
 // In this module, we use 's_axis' and 'm_axis' prefix to refer to
 // the AXI-Stream Subordinate or Target interface and
 // Manager or Initiator interface
@@ -51,6 +63,17 @@
 // entity the request is addressed to
 // If you find offensive terms in this module, please contact carles@upv.es
 //
+// Notice:
+//
+// 1. The XXXTargetIf (s) ports of the NI must be connected
+//    to YYYInitiatorIf (m) ports of the unit (processing element)
+//    that is going to use the provided network services
+//    and viceversa
+//    The XXXTargetIf parameters of the NI must be connected
+//    to YYYInitiatorIf parameters of the unit (processing element)
+//    that is going to use the provided network services
+
+
 
 `timescale 1ns/1ns
 
@@ -64,6 +87,10 @@ module single_unit_network_interface #(
   parameter integer NetworkIfNumberOfVirtualChannels = 0,  // Network configuration. Total number of virtual channels in the network.
   parameter integer NetworkIfNumberOfVirtualNetworks = 0,  // Network configuration. Total number of virtual networks.
 
+  // Notice: The XXXTargetIf parameters of the NI must be connected
+  // to YYYInitiatorIf parameters of the unit (processing element)
+  // that is going to use the provided network services
+
   parameter integer AxiStreamTargetIfEnable     = 0,  // Unit AXI Stream Target interface configuration. 0 to disable the interface, any other value to enable it.
   parameter integer AxiStreamTargetIfTDataWidth = 0,  // Unit AXI Stream Target interface configuration. Size (in bits) of the data signal.
   parameter integer AxiStreamTargetIfTIdWidth   = 0,  // Unit AXI Stream Target interface configuration. Size (in bits) of the stream identifier signal.
@@ -72,7 +99,13 @@ module single_unit_network_interface #(
   parameter integer AxiStreamInitiatorIfEnable      = 0,  // Unit AXI Stream Initiator interface configuration. 0 to disable the interface, any other value to enable it.
   parameter integer AxiStreamInitiatorIfTDataWidth  = 0,  // Unit AXI Stream Initiator interface configuration. Size (in bits) of the data signal.
   parameter integer AxiStreamInitiatorIfTIdWidth    = 0,  // Unit AXI Stream Initiator interface configuration. Size (in bits) of the stream identifier signal.
-  parameter integer AxiStreamInitiatorIfTDestWidth  = 0   // Unit AXI Stream Initiator interface configuration. Size (in bits) of the stream destination signal.
+  parameter integer AxiStreamInitiatorIfTDestWidth  = 0,  // Unit AXI Stream Initiator interface configuration. Size (in bits) of the stream destination signal.
+  
+  parameter integer FileRegInitiatorIfEnable     = 0,  // FileReg Initiator interface configuration. 0 to disable the interface, other value to enable it
+  parameter integer FileRegInitiatorIfTDataWidth = 0,  // FileReg Initiator interface configuration. Size (in bits) of the data field
+
+  parameter integer FileRegTargetIfEnable        = 0,  // FileReg Target interface configuration. 0 to disable the interface, other value to enable it.
+  parameter integer FileRegTargetIfTDataWidth    = 0   // FileReg Target interface configuration. Size (in bits) of the data field
 ) (
   // clocks and resets
   input clk_s_axis_i,
@@ -87,7 +120,21 @@ module single_unit_network_interface #(
   input rst_upsizer_i,
   input rst_downsizer_i,
 
-  // TODO interface to access the configuration and monitor register file
+  // Interface to access the configuration and monitor register file
+  input                                  filereg_s_tvalid_i,
+  output                                 filereg_s_tready_o,
+  input  [FileRegTargetIfTDataWidth-1:0] filereg_s_tdata_i,
+  input                                  filereg_s_tlast_i,
+
+  output                                    filereg_m_tvalid_o,
+  input                                     filereg_m_tready_i,
+  output [FileRegInitiatorIfTDataWidth-1:0] filereg_m_tdata_o,
+  output                                    filereg_m_tlast_o,
+
+  // Notice: The XXXTargetIf (s) ports of the NI must be connected
+  // to YYYInitiatorIf (m) ports of the unit (processing element)
+  // that is going to use the provided network services
+  // and viceversa
 
   // AXI-Stream (Target) interface to connect an AXI-Stream initiator unit
   input                                   s_axis_tvalid_i,
@@ -126,10 +173,21 @@ module single_unit_network_interface #(
                                         NetworkIfBroadcastWidth +
                                         NetworkIfVirtualNetworkIdWidth;
 
-  // Drive connections between Ejector and AXI-Stream fromnet (including mux and arbiter)
-  wire                        data_from_network_valid;
-  wire                        data_from_network_ready;
+  // Drive connections between Ejector and fromnets, these signals do not
+  // traverse the demultplexor located at the output of network ejector
   wire [NetworkDataWidth-1:0] data_from_network;
+
+  // Drive connections between network ejector and demultiplexor located at
+  // the output of network ejector
+  wire                        data_from_network_valid;
+  reg                         data_from_network_ready; // It's combinational logic inside block always @(*)
+
+  // Drive connections between ejector and demuliplexor, located at
+  // the output of network ejector, and different fromnets
+  // Currently, there are two fromnets: axistream_fromnet and filereg_fromnet
+  reg  [1:0]                                network_ejector_demux_valid;
+  wire [1:0]                                network_ejector_demux_ready;
+  wire [NetworkIfVirtualNetworkIdWidth-1:0] network_ejector_demux_select;
 
 
   // Drive AXI-Stream tonet module signals and network output ports
@@ -242,12 +300,12 @@ module single_unit_network_interface #(
         .m_axis_tid_o   (m_axis_tid),
         .m_axis_tdest_o (m_axis_tdest),
 
-        .network_valid_i(data_from_network_valid),
-        .network_ready_o(data_from_network_ready),
+        .network_valid_i(network_ejector_demux_valid[1]),
+        .network_ready_o(network_ejector_demux_ready[1]),
         .network_data_i (data_from_network)
       );
     end else begin
-      assign data_from_network_ready = 1'b1;  // perfect sink, although is an invalid path actually
+      assign network_ejector_demux_ready[1] = 1'b1;  // perfect sink, although is an invalid path actually
       assign m_axis_tvalid = 1'b0;
       assign m_axis_tlast  = 1'b0;
       assign m_axis_tdata  = {AxiStreamInitiatorIfTDataWidth{1'b0}};
@@ -269,6 +327,97 @@ module single_unit_network_interface #(
     .valid_o(network_valid),
     .avail_i(network_ready_i)
   );
+
+
+  generate
+    if (FileRegTargetIfEnable != 0) begin : filereg_target_if
+  // TODO Not need by now, but instance here when required
+  // FileReg target (Subordinate) interface part
+  // (the manager part is the filereg entity)
+  // It drives into the NoC responses to filereg access requests
+    end else begin
+      assign filereg_s_tready_o = 1'b1; // perfect sink by the moment
+    end
+  endgenerate
+
+  // FileReg initiator (Manager) interface part
+  // (The subordinate part is the filereg entity)
+  // It attends access requests to router register file
+  generate
+    if (FileRegInitiatorIfEnable != 0) begin : filereg_initiator_if
+      filereg_fromnet #(
+        .FileRegIfDataWidth(FileRegInitiatorIfTDataWidth),
+
+        .NetworkIfFlitWidth            (NetworkIfFlitWidth),
+        .NetworkIfFlitTypeWidth        (NetworkIfFlitTypeWidth),
+        .NetworkIfBroadcastWidth       (NetworkIfBroadcastWidth),
+        .NetworkIfVirtualNetworkIdWidth(NetworkIfVirtualNetworkIdWidth)      
+      ) network2filereg_decoupler_inst (
+        .clk_i(clk_network_i),
+        .rst_i(rst_network_i),
+
+        .filereg_m_tvalid_o(filereg_m_tvalid_o),
+        .filereg_m_tready_i(filereg_m_tready_i),
+        .filereg_m_tdata_o (filereg_m_tdata_o),
+        .filereg_m_tlast_o (filereg_m_tlast_o),
+
+        .network_valid_i(network_ejector_demux_valid[0]),
+        .network_ready_o(network_ejector_demux_ready[0]),
+        .network_data_i (data_from_network)
+      );
+
+      // network_ejector_demux
+      // Demultiplexor from Network Ejector Output interface
+      // to different fromnets
+      always @(*) begin
+        data_from_network_ready = 0;
+        network_ejector_demux_valid = 0;
+
+        if (network_ejector_demux_select == 0) begin
+          network_ejector_demux_valid[0] = data_from_network_valid;
+          data_from_network_ready = network_ejector_demux_ready[0];
+        end
+
+        if (network_ejector_demux_select != 0) begin
+          network_ejector_demux_valid[1] = data_from_network_valid;
+          data_from_network_ready = network_ejector_demux_ready[1];
+        end
+      end
+
+      // Unpack network signals for getting virtual network id,
+      // which is required by network_ejector_demux
+      network_signal_converter #(
+        .NetworkIfFlitWidth            (NetworkIfFlitWidth),
+        .NetworkIfFlitTypeWidth        (NetworkIfFlitTypeWidth),
+        .NetworkIfBroadcastWidth       (NetworkIfBroadcastWidth),
+        .NetworkIfVirtualNetworkIdWidth(NetworkIfVirtualNetworkIdWidth)
+      ) network_signal_unpacker_inst (
+        .network_valid_i(1'b0),
+        .network_ready_o(),
+        .network_data_i (data_from_network),
+ 
+        .network_valid_o             (),
+        .network_ready_i             (1'b0),
+        .network_flit_o              (),
+        .network_flit_type_o         (),
+        .network_broadcast_o         (),
+        .network_virtual_network_id_o(network_ejector_demux_select)
+      );
+    end else begin
+      assign network_ejector_demux_ready[0] = 1'b1;  // perfect sink, although is an invalid path actually
+      always @(*) network_ejector_demux_valid[0] = 1'b0;
+
+      assign filereg_m_tvalid_o = 1'b0;
+      assign filereg_m_tlast_o  = 1'b0;
+      assign filereg_m_tdata_o  = {FileRegInitiatorIfTDataWidth{1'b0}};
+
+      // In case reg file access is not enabled,
+      // all networks will be for data, even Virtual Network 0
+      always @(*) data_from_network_ready = network_ejector_demux_ready[1];
+      always @(*) network_ejector_demux_valid[1] = data_from_network_valid;
+    end
+  endgenerate
+
 
   // Entry point for the flits coming from the network through
   // the local port of the router

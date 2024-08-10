@@ -32,6 +32,7 @@
 #    "<repo_dir>/rtl/common/axis_converter_signals.v"
 #    "<repo_dir>/rtl/network_interface/axis_data_downsizer.v"
 #    "<repo_dir>/rtl/network_interface/axis_data_upsizer.v"
+#    "<repo_dir>/rtl/network_interface/filreg_fromnet.v"
 #    "<repo_dir>/rtl/network_interface/axistream_fromnet.v"
 #    "<repo_dir>/rtl/network_interface/axistream_tonet.v"
 #    "<repo_dir>/rtl/common/fifo_type_1_async/fifo_mem.v"
@@ -62,11 +63,11 @@ proc checkRequiredFiles { origin_dir} {
   set files [list \
  "[file normalize "$origin_dir/vivado/2022.2/single_unit_network_interface/ip/axi4stream_vip_s/axi4stream_vip_s.xci"]"\
  "[file normalize "$origin_dir/vivado/2022.2/single_unit_network_interface/ip/axi4stream_vip_m/axi4stream_vip_m.xci"]"\
- "[file normalize "$origin_dir/vivado/2022.2/single_unit_network_interface/sim/duv.v"]"\
  "[file normalize "$origin_dir/rtl/misc/axis_2_native_fifo.v"]"\
  "[file normalize "$origin_dir/rtl/common/axis_converter_signals.v"]"\
  "[file normalize "$origin_dir/rtl/network_interface/axis_data_downsizer.v"]"\
  "[file normalize "$origin_dir/rtl/network_interface/axis_data_upsizer.v"]"\
+ "[file normalize "$origin_dir/rtl/network_interface/filereg_fromnet.v"]"\
  "[file normalize "$origin_dir/rtl/network_interface/axistream_fromnet.v"]"\
  "[file normalize "$origin_dir/rtl/network_interface/axistream_tonet.v"]"\
  "[file normalize "$origin_dir/rtl/common/fifo_type_1_async/fifo_mem.v"]"\
@@ -89,6 +90,7 @@ proc checkRequiredFiles { origin_dir} {
  "[file normalize "$origin_dir/sim/single_unit_network_interface/dv/tests/single_unit_network_interface_test_pkg.sv"]"\
  "[file normalize "$origin_dir/sim/single_unit_network_interface/dv/tests/single_unit_network_interface_ejeccion_test.sv"]"\
  "[file normalize "$origin_dir/sim/single_unit_network_interface/dv/tests/single_unit_network_interface_base_test.sv"]"\
+ "[file normalize "$origin_dir/sim/single_unit_network_interface/dv/tb/duv.sv"]"\
  "[file normalize "$origin_dir/sim/single_unit_network_interface/dv/tb/tb.sv"]"\
   ]
   foreach ifile $files {
@@ -215,6 +217,7 @@ set files [list \
  [file normalize "${repo_dir}/rtl/common/axis_converter_signals.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/axis_data_downsizer.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/axis_data_upsizer.v"] \
+ [file normalize "${repo_dir}/rtl/network_interface/filereg_fromnet.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/axistream_fromnet.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/axistream_tonet.v"] \
  [file normalize "${repo_dir}/rtl/common/fifo_type_1_async/fifo_mem.v"] \
@@ -231,6 +234,7 @@ set files [list \
  [file normalize "${repo_dir}/rtl/common/fifo_type_1_async/sync.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/validready2noc_handshake_adapter.v"] \
  [file normalize "${repo_dir}/rtl/common/fifo_type_1_async/wr_ptr_full.v"] \
+ [file normalize "${repo_dir}/sim/single_unit_network_interface/dv/tb/duv.sv"]\
 ]
 add_files -norecurse -fileset $obj $files
 
@@ -238,7 +242,6 @@ add_files -norecurse -fileset $obj $files
 set files [list \
  [file normalize "${repo_dir}/vivado/2022.2/single_unit_network_interface/ip/axi4stream_vip_s/axi4stream_vip_s.xci" ]\
  [file normalize "${repo_dir}/vivado/2022.2/single_unit_network_interface/ip/axi4stream_vip_m/axi4stream_vip_m.xci" ]\
- [file normalize "${repo_dir}/vivado/2022.2/single_unit_network_interface/sim/duv.v"]\
 ]
 set imported_files [import_files -fileset sources_1 $files]
 
@@ -249,6 +252,11 @@ generate_target all [get_files $file_obj]
 set file "axi4stream_vip_s/axi4stream_vip_s.xci"
 set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
 generate_target all [get_files $file_obj] 
+
+set file "$repo_dir/sim/single_unit_network_interface/dv/tb/duv.sv"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "SystemVerilog" -objects $file_obj
 
 
 # Create 'constrs_1' fileset (if not found)
