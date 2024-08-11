@@ -1,52 +1,22 @@
-
-//////////////////////////////////////////////////////////////////////////////////
-// (c) Copyright 2012 - 2017  Parallel Architectures Group (GAP)
-// Department of Computing Engineering (DISCA)
-// Universitat Politecnica de Valencia (UPV)
-// Valencia, Spain
-// All rights reserved.
+// SPDX-FileCopyrightText: (c) 2024  Parallel Architectures Group (GAP) <carherlu@upv.edu.es>
+// SPDX-License-Identifier: MIT
 //
-// All code contained herein is, and remains the property of
-// Parallel Architectures Group. The intellectual and technical concepts
-// contained herein are proprietary to Parallel Architectures Group and
-// are protected by trade secret or copyright law.
-// Dissemination of this code or reproduction of this material is
-// strictly forbidden unless prior written permission is obtained
-// from Parallel Architectures Group.
 //
-// THIS SOFTWARE IS MADE AVAILABLE "AS IS" AND IT IS NOT INTENDED FOR USE
-// IN WHICH THE FAILURE OF THE SOFTWARE COULD LEAD TO DEATH, PERSONAL INJURY,
-// OR SEVERE PHYSICAL OR ENVIRONMENTAL DAMAGE.
+// @file noc_output_handshake_adapter.v 
+// @author Rafael Tornero (ratorga@disca.upv.es)
+// @date July 26th, 2024
 //
-// contact: jflich@disca.upv.es
-//-----------------------------------------------------------------------------
+// Adapter from Avail/Valid NoC handshake to Valid/Ready
+// standar handshake.
 //
-// Company:  GAP (UPV)
-// Engineer: jomarm10 (jomarm10@gap.upv.es)
-// Description: This module is an interface handshake adapter between data
-// leaving the NoC towards the next module, the processing element or a FIFO.
-// The endpoint module interface is an standard rtl valid/ready interface.
-// 
-//  -------     -----------------------------      ----------------------
-//  |  NoC | --> | noc_out_handshake_adapter | --> | processing element |
-//  -------     -----------------------------      ----------------------
-//
-// Some modules on this NoC generate data with a flight-time of two cycles. 
-// This could lead to data loss when interfacing regular ready/valid handshake
-// interfaces. So, this module deals with inflight data temporal buffering, and
-// control signlas handshake between NoC output modules and the destination 
-// input ports (regular rtl ready/valid handshake).
-//
-// To avoid data loss, this module implements:
-//  an intermediate buffer for in-flight data
-//  a handshake signals adapter 
-//
-// Revision:
-// Revision 1.0 - File Created by V.Scotti (vinc94@gmail.com)  
-// Revision 1.1 - Fix some fsm loops (replace concurrent assignments)
+// It takes into account that the NoC handshake last upto two
+// cycles to deassert valid when available is deasserted.
+// This is because the downstream module deasserts valid when
+// it realizes available is deasserted and this condition happens
+// one cycle after deassertion of available and then it takes and
+// additional cycle to deassert valid.
 
 `timescale 1ns / 1ps
-//`default_nettype none
 
 module noc_outport_handshake_adapter #(
   parameter DataWidth = 0
@@ -65,23 +35,27 @@ module noc_outport_handshake_adapter #(
 );
 
   //  fsm_state_e state, next_state;
-  localparam IDLE = 1'b0;
-  localparam MEM  = 1'b1;
-  reg state;
-  reg next_state;
+  localparam IDLE  = 2'b00;
+  localparam MEM1  = 2'b01;
+  localparam MEM2  = 2'b10;
+  reg [1:0] state;
+  reg [1:0] next_state;
 
 
-  // Memory to store the valid data that could come in 
-  // in same cycle full is asserted
-  reg [DataWidth-1:0] data_i_buff = 0;
-  reg                 data_valid_i_buff;
- 
+  // Memory to store the valid data that could come when
+  // NoC avail is deasserted
+  reg [DataWidth-1:0] data_i_buff[0:1];
+  reg                 buff1_en;
+  reg                 buff2_en;  
   
   // these are combinational paths
   reg                 data_valid_from_mux;
   reg [DataWidth-1:0] data_from_mux;
-  reg                 buff_en;
   reg                 handshake_complete;
+  
+  wire output_reg_busy;
+  
+  assign output_reg_busy = (data_valid_o == 1) && (handshake_complete == 0);
 
   always @(posedge clk) begin
     if (rst) begin
@@ -96,14 +70,33 @@ module noc_outport_handshake_adapter #(
 
     case (state)
       IDLE: begin
-        if (buff_en) begin
-          next_state = MEM;
+        if ((data_valid_i == 1) && (output_reg_busy == 1)) begin
+          next_state = MEM1;
         end
       end
 
-      MEM: begin
-        if (~handshake_complete) begin
-          next_state = MEM;
+      MEM1: begin
+        if ((data_valid_i == 1) && (handshake_complete == 0)) begin
+          next_state = MEM2;
+        end
+        
+        if ((data_valid_i == 1) && (handshake_complete == 1)) begin
+          next_state = MEM1;
+        end                
+        
+        if ((data_valid_i == 0) && (handshake_complete == 0)) begin
+          next_state = MEM1;
+        end
+      end
+      
+      MEM2: begin
+        // In this state, data_valid_i must be deasserted already
+        if (handshake_complete == 0) begin
+          next_state = MEM2;
+        end
+        
+        if (handshake_complete == 1) begin
+          next_state = MEM1;
         end
       end
     endcase
@@ -114,78 +107,65 @@ module noc_outport_handshake_adapter #(
   // in the network handshake valid cannot be asserted
   // upto avail_o is asserted, so the ejector would not receive valids
   // from network if the other end (Valid/Ready handshake) 
-  // waits for valid before asserting ready since avaail_o = ~full_i
+  // waits for valid before asserting ready since avail_o = ~full_i
   // means propagate ready.
   always @(*) begin
-    avail_o = (data_valid_o == 1'b0) || (handshake_complete == 1'b1); //~full_i;
+    avail_o = (data_valid_o == 1'b0);
   end
   
+  // Buffer enablers
   always @(*) begin
-    buff_en = (full_i == 1'b1) && (data_valid_i == 1'b1) && (data_valid_o == 1'b1);
+    buff1_en = ((state == IDLE) && (data_valid_i == 1'b1) && (output_reg_busy == 1)) ||
+               ((state == MEM1) && (data_valid_i == 1'b1) && (handshake_complete == 1));
+    buff2_en = ((state == MEM1) && (data_valid_i == 1'b1) && (handshake_complete == 0));
   end
   
   always @(*) begin
     handshake_complete = (full_i == 1'b0) && (data_valid_o == 1'b1);
   end
   
+  // FIFO mode
   always @(posedge clk) begin
     if (rst) begin
-      data_valid_i_buff <= 0;
-      //data_i_buff <= 0;
-    end else if (buff_en) begin 
-      data_valid_i_buff <= data_valid_i;
-      data_i_buff <= data_i;
+    end else if ((buff1_en == 1) || (buff2_en == 1)) begin 
+      data_i_buff[0] <= data_i;
     end
   end
+  always @(posedge clk) begin
+    if (rst) begin
+    end else if (buff2_en == 1) begin
+      data_i_buff[1] <= data_i_buff[0];        
+    end
+  end
+    
   
   // Mux to select what goes to the data Valid/Ready interface
   //  Select==0: data coming from input
-  //  Select==1: data coming from internal memory
+  //  Select==1: data coming from internal memory 1
+  //  Select==2; data coming from internal memory 2
   always @(*) begin
     data_valid_from_mux = data_valid_i;
     data_from_mux = data_i;
     
-    if (state == MEM) begin
-      data_valid_from_mux = data_valid_i_buff;
-      data_from_mux       = data_i_buff;
+    if (state == MEM1) begin
+      data_valid_from_mux = 1;
+      data_from_mux       = data_i_buff[0];
     end
+    
+    if (state == MEM2) begin
+      data_valid_from_mux = 1;
+      data_from_mux       = data_i_buff[1];
+    end    
   end
   
   // Output data Valid/Ready interface
   always @(posedge clk) begin
     if (rst) begin
       data_valid_o <= 0;
-      //data_o <= 0
    end else if ((handshake_complete) || (data_valid_o == 1'b0)) begin
       data_valid_o <= data_valid_from_mux;
       data_o       <= data_from_mux;
     end
   end
-
-//  always @(posedge clk) begin
-//    if (rst) begin
-//      buff_en <= 1'b0;
-//      data_valid_o <= data_valid_i;
-//      data_o <= data_i;
-//    end else begin
-//      case (state)
-//        IDLE: begin
-//          buff_en <= 1'b1;
-//          data_o <= data_i;
-//          data_valid_o <= data_valid_i;
-//        end
-//        MEM: begin
-//          buff_en <= 1'b0;
-//          data_o <= data_i_buff;
-//          data_valid_o <= data_valid_i_buff;
-//        end
-//        default: begin
-//          buff_en <= 1'b0;
-//          data_o <= data_i;
-//          data_valid_o <= data_valid_i;
-//        end
-//      endcase
-//    end
-//  end
   
 endmodule
