@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 //
 //
-// @file duv.v
+// @file duv.sv
 // @author Rafael Tornero (ratorga@disca.upv.es)
 // @date March 08th, 2024
 //

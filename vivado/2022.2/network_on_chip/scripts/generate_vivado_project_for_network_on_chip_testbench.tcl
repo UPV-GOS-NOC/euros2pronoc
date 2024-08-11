@@ -23,14 +23,20 @@
 #
 #    "<repo_dir>/vivado/2022.2/network_on_chip/ip/axi4stream_vip_s/axi4stream_vip_s.xci"
 #    "<repo_dir>/vivado/2022.2/network_on_chip/ip/axi4stream_vip_m/axi4stream_vip_m.xci"
-#    "<repo_dir>/vivado/2022.2/network_on_chip/sim/axis_vip_tile.v"
-#    "<repo_dir>/vivado/2022.2/network_on_chip/sim/duv.v"
+#    "<repo_dir>/sim/network_ejector_agent/network_if.sv"
+#    "<repo_dir>/sim/network_on_chip/dv/env/network_on_chip_env_pkg.sv"
+#    "<repo_dir>/sim/network_on_chip/dv/tests/network_on_chip_base_test.sv"
+#    "<repo_dir>/sim/network_on_chip/dv/tests/network_on_chip_ejeccion_test.sv"
+#    "<repo_dir>/sim/network_on_chip/dv/tb/axis_vip_tile.sv"
+#    "<repo_dir>/sim/network_on_chip/dv/tb/duv.sv"
+#    "<repo_dir>/sim/network_on_chip/dv/tb/tb.sv"
 #
 #    NI:
 #    "<repo_dir>/rtl/misc/axis_2_native_fifo.v"
 #    "<repo_dir>/rtl/common/axis_converter_signals.v"
 #    "<repo_dir>/rtl/network_interface/axis_data_downsizer.v"
 #    "<repo_dir>/rtl/network_interface/axis_data_upsizer.v"
+#    "<repo_dir>/rtl/network_interface/filereg_fromnet.v"
 #    "<repo_dir>/rtl/network_interface/axistream_fromnet.v"
 #    "<repo_dir>/rtl/network_interface/axistream_tonet.v"
 #    "<repo_dir>/rtl/common/fifo_type_1_async/fifo_mem.v"
@@ -47,11 +53,6 @@
 #    "<repo_dir>/rtl/common/fifo_type_1_async/sync.v"
 #    "<repo_dir>/rtl/network_interface/validready2noc_handshake_adapter.v"
 #    "<repo_dir>/rtl/common/fifo_type_1_async/wr_ptr_full.v"
-#    "<repo_dir>/sim/network_ejector_agent/network_if.sv"
-#    "<repo_dir>/sim/network_on_chip/dv/env/network_on_chip_env_pkg.sv"
-#    "<repo_dir>/sim/network_on_chip/dv/tests/network_on_chip_base_test.sv"
-#    "<repo_dir>/sim/network_on_chip/dv/tb/tb.sv"
-#    "<repo_dir>/sim/network_on_chip/dv/tests/network_on_chip_ejeccion_test.sv"
 #
 #    ROUTER:
 #    "<repo_dir>/rtl/router-vc/encoder.v"
@@ -72,54 +73,6 @@
 #    "<repo_dir>/rtl/router-vc/va_local_dynamic.v"
 #    "<repo_dir>/rtl/router-vc/va_static.v"
 #*****************************************************************************************
-
-#  set files [list \
-# "[file normalize "$origin_dir/vivado/2022.2/network_on_chip/ip/axi4stream_vip_s/axi4stream_vip_s.xci"]"\
-# "[file normalize "$origin_dir/vivado/2022.2/network_on_chip/ip/axi4stream_vip_m/axi4stream_vip_m.xci"]"\
-# "[file normalize "$origin_dir/vivado/2022.2/network_on_chip/sim/axis_vip_tile.v"]"\
-# "[file normalize "$origin_dir/vivado/2022.2/network_on_chip/sim/duv.v"]"\
-# "[file normalize "$origin_dir/rtl/misc/axis_2_native_fifo.v"]"\
-# "[file normalize "$origin_dir/rtl/common/axis_converter_signals.v"]"\
-# "[file normalize "$origin_dir/rtl/network_interface/axis_data_downsizer.v"]"\
-# "[file normalize "$origin_dir/rtl/network_interface/axis_data_upsizer.v"]"\
-# "[file normalize "$origin_dir/rtl/network_interface/axistream_fromnet.v"]"\
-# "[file normalize "$origin_dir/rtl/network_interface/axistream_tonet.v"]"\
-# "[file normalize "$origin_dir/rtl/common/fifo_type_1_async/fifo_mem.v"]"\
-# "[file normalize "$origin_dir/rtl/common/fifo_type_1_async/fifo_type_1_async.v"]"\
-# "[file normalize "$origin_dir/rtl/misc/fifo_type_1_async_axis_wrapper.v"]"\
-# "[file normalize "$origin_dir/rtl/misc/native_fifo_2_axi.v"]"\
-# "[file normalize "$origin_dir/rtl/network_interface/network_data_axis_downsizer.v"]"\
-# "[file normalize "$origin_dir/rtl/network_interface/network_ejector.v"]"\
-# "[file normalize "$origin_dir/rtl/network_interface/network_signal_converter.v"]"\
-# "[file normalize "$origin_dir/rtl/network_interface/noc_outport_handshake_adapter.v"]"\
-# "[file normalize "$origin_dir/rtl/network_interface/noc_packet_creator.v"]"\
-# "[file normalize "$origin_dir/rtl/common/fifo_type_1_async/rd_ptr_empty.v"]"\
-# "[file normalize "$origin_dir/rtl/network_interface/single_unit_network_interface.v"]"\
-# "[file normalize "$origin_dir/rtl/common/fifo_type_1_async/sync.v"]"\
-# "[file normalize "$origin_dir/rtl/network_interface/validready2noc_handshake_adapter.v"]"\
-# "[file normalize "$origin_dir/rtl/common/fifo_type_1_async/wr_ptr_full.v"]"\
-# "[file normalize "${origin_dir}/rtl/router-vc/encoder.v"]" \
-# "[file normalize "${origin_dir}/rtl/router-vc/filereg.v"]" \
-# "[file normalize "${origin_dir}/rtl/router-vc/fpa.v"]" \
-# "[file normalize "${origin_dir}/rtl/router-vc/fpa_x_in.v"]" \
-# "[file normalize "${origin_dir}/rtl/router-vc/ibuffer.v"]" \
-# "[file normalize "${origin_dir}/rtl/router-vc/output_vc.v"]" \
-# "[file normalize "${origin_dir}/rtl/router-vc/rot_left_x_in.v"]" \
-# "[file normalize "${origin_dir}/rtl/router-vc/rot_right_x_in.v"]" \
-# "[file normalize "${origin_dir}/rtl/router-vc/routing_algorithm_lbdr_2d.v"]" \
-# "[file normalize "${origin_dir}/rtl/router-vc/routing_algorithm_xy.v"]" \
-# "[file normalize "${origin_dir}/rtl/router-vc/routing_vc.v"]" \
-# "[file normalize "${origin_dir}/rtl/router-vc/rr_x_in.v"]" \
-# "[file normalize "${origin_dir}/rtl/router-vc/sa_vc.v"]" \
-# "[file normalize "${origin_dir}/rtl/router-vc/switch_vc.v"]" \
-# "[file normalize "${origin_dir}/rtl/router-vc/update_token_x_in.v"]" \
-# "[file normalize "${origin_dir}/rtl/router-vc/va_local_dynamic.v"]" \
-# "[file normalize "${origin_dir}/rtl/router-vc/va_static.v"]" \
-# "[file normalize "$origin_dir/sim/network_on_chip_agent/network_on_chip_agent_pkg.sv"]"\
-# "[file normalize "$origin_dir/sim/network_on_chip/dv/env/network_on_chip_env_pkg.sv"]"\
-# "[file normalize "$origin_dir/sim/network_on_chip/dv/tests/network_on_chip_base_test.sv"]"\
-# "[file normalize "$origin_dir/sim/network_on_chip/dv/tb/tb.sv"]"\
-#  ]
 
 
 # Check file required for this script exists
@@ -226,6 +179,7 @@ set source_files_to_add [list \
  [file normalize "${repo_dir}/rtl/common/axis_converter_signals.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/axis_data_downsizer.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/axis_data_upsizer.v"] \
+ [file normalize "${repo_dir}/rtl/network_interface/filereg_fromnet.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/axistream_fromnet.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/axistream_tonet.v"] \
  [file normalize "${repo_dir}/rtl/common/fifo_type_1_async/fifo_mem.v"] \
@@ -259,13 +213,13 @@ set source_files_to_add [list \
  [file normalize "${repo_dir}/rtl/router-vc/update_token_x_in.v"] \
  [file normalize "${repo_dir}/rtl/router-vc/va_local_dynamic.v"] \
  [file normalize "${repo_dir}/rtl/router-vc/va_static.v"] \
+ [file normalize "${repo_dir}/sim/network_on_chip/dv/tb/axis_vip_tile.sv"]\
+ [file normalize "${repo_dir}/sim/network_on_chip/dv/tb/duv.sv"]\
 ]
 
 set sim_files_to_import [list \
  [file normalize "${repo_dir}/vivado/2022.2/network_on_chip/ip/axi4stream_vip_s/axi4stream_vip_s.xci" ]\
  [file normalize "${repo_dir}/vivado/2022.2/network_on_chip/ip/axi4stream_vip_m/axi4stream_vip_m.xci" ]\
- [file normalize "${repo_dir}/vivado/2022.2/network_on_chip/sim/axis_vip_tile.v"]\
- [file normalize "${repo_dir}/vivado/2022.2/network_on_chip/sim/duv.v"]\
 ]
 
 set sim_files_to_add [list \
@@ -314,12 +268,23 @@ if {[string equal [get_filesets -quiet sources_1] ""]} {
 
 # Set 'sources_1' fileset object
 set obj [get_filesets sources_1]
-set_property -name "include_dirs" -value "[file normalize "$repo_dir/rtl/router-vc"] [file normalize "${repo_dir}/vivado/2022.2/network_on_chip/sim"]" -objects $obj
+set_property -name "include_dirs" -value "[file normalize "$repo_dir/rtl/router-vc"] [file normalize "${repo_dir}/sim/network_on_chip/dv/tb"] [file normalize "${repo_dir}/vivado/2022.2/network_on_chip/sim"]" -objects $obj
+
 add_files -norecurse -fileset $obj $source_files_to_add
 
 # Import files into project folder
 set imported_files [import_files -fileset sources_1 $sim_files_to_import]
-set_property -name "top" -value "duv" -objects $obj
+
+
+set file "$repo_dir/sim/network_on_chip/dv/tb/axis_vip_tile.sv"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "SystemVerilog" -objects $file_obj
+
+set file "$repo_dir/sim/network_on_chip/dv/tb/duv.sv"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "SystemVerilog" -objects $file_obj
 
 set file "axi4stream_vip_m/axi4stream_vip_m.xci"
 set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
@@ -329,6 +294,7 @@ set file "axi4stream_vip_s/axi4stream_vip_s.xci"
 set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
 generate_target all [get_files $file_obj] 
 
+set_property -name "top" -value "duv" -objects $obj
 
 # Create 'constrs_1' fileset (if not found)
 if {[string equal [get_filesets -quiet constrs_1] ""]} {
@@ -396,6 +362,7 @@ set obj [get_filesets sim_1]
 set_property -name "include_dirs" -value "[file normalize "/opt/Xilinx/Vivado/2022.2/data/xilinx_vip/include"] \
                                           [file normalize "$repo_dir/sim/network_on_chip_agent"] \
                                           [file normalize "$repo_dir/sim/network_on_chip"] \
+                                          [file normalize "$repo_dir/sim/network_on_chip/dv/tb"] \
                                           [file normalize "$repo_dir/rtl/router-vc"] \
                                           [file normalize "${repo_dir}/vivado/2022.2/network_on_chip/sim"]" -objects $obj
 set_property -name "top" -value "tb" -objects $obj

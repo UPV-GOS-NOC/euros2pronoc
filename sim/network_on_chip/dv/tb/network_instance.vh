@@ -15,6 +15,24 @@
 //
 // It is not intended to be used in standalone mode.
 
+ 
+// The FileRegXXXIfYYY parameters follow CamelCase convention because they could turn into parameters in the future
+// FileReg is a target (subordinate) device and will receive request through its subordinate port and
+// will generate responses through its initiator (manager) port. Then, the NI will
+// connect the device FileRegInitiatorIf to the NI FileRegTargetIf and viceversa
+
+// FileReg Initiator interface configuration. 0 to disable the interface and 1 to enable it.
+localparam integer FileRegInitiatorIfEnable = 0;
+
+// FileReg Initiator interface configuration. Size (in bits) of the TData port
+localparam integer FileRegInitiatorIfTDataWidth = 32 + NetworkSwitchAddressIdWidth;
+
+// FileReg Target interface configuration. 0 to disable the interface and 1 to enable it. 
+localparam integer FileRegTargetIfEnable = 0;
+
+// FileReg Target interface configuration. Size (in bits) of the TData port
+localparam integer FileRegTargetIfTDataWidth = 39;   
+
 // Indexes in the signals network array (network_xxx)
 localparam integer NI2ROUTER = 0;
 localparam integer ROUTER2NI = 1;
@@ -78,6 +96,15 @@ wire                                      m_axis_tlast;
 wire [AxiStreamInitiatorIfTIdWidth-1:0]   m_axis_tid;
 wire [AxiStreamInitiatorIfTDestWidth-1:0] m_axis_tdest; 
 
+wire                                    m_filereg_valid;
+wire                                    m_filereg_ready;
+wire [FileRegInitiatorIfTDataWidth-1:0] m_filereg_data;
+wire                                    m_filereg_last;
+
+wire                                 s_filereg_valid;
+wire                                 s_filereg_ready;
+wire [FileRegTargetIfTDataWidth-1:0] s_filereg_data;
+wire                                 s_filereg_last;
 
 single_unit_network_interface #(
   .NetworkIfAddressId              (NetworkSwitchAddressId),
@@ -89,6 +116,10 @@ single_unit_network_interface #(
   .NetworkIfNumberOfVirtualChannels(NetworkIfNumberOfVirtualChannels),
   .NetworkIfNumberOfVirtualNetworks(NetworkIfNumberOfVirtualNetworks),
 
+  // The XXXTargetIf parameters of the NI must be connected
+  // to YYYInitiatorIf parameters of the unit (processing element)
+  // that is going to use the provided network services
+ 
   .AxiStreamTargetIfEnable    (AxiStreamInitiatorIfEnable),
   .AxiStreamTargetIfTDataWidth(AxiStreamInitiatorIfTDataWidth),
   .AxiStreamTargetIfTIdWidth  (AxiStreamInitiatorIfTIdWidth),
@@ -97,7 +128,13 @@ single_unit_network_interface #(
   .AxiStreamInitiatorIfEnable    (AxiStreamTargetIfEnable),
   .AxiStreamInitiatorIfTDataWidth(AxiStreamTargetIfTDataWidth),
   .AxiStreamInitiatorIfTIdWidth  (AxiStreamTargetIfTIdWidth),
-  .AxiStreamInitiatorIfTDestWidth(AxiStreamTargetIfTDestWidth)
+  .AxiStreamInitiatorIfTDestWidth(AxiStreamTargetIfTDestWidth),
+
+  .FileRegInitiatorIfEnable    (FileRegTargetIfEnable),
+  .FileRegInitiatorIfTDataWidth(FileRegTargetIfTDataWidth),
+
+  .FileRegTargetIfEnable    (FileRegInitiatorIfEnable),
+  .FileRegTargetIfTDataWidth(FileRegInitiatorIfTDataWidth)
 ) network_interface_inst (
   .clk_s_axis_i   (clk_m_axis_i),
   .clk_m_axis_i   (clk_s_axis_i),
@@ -110,6 +147,11 @@ single_unit_network_interface #(
   .rst_network_i  (rst_network_i),
   .rst_upsizer_i  (rst_upsizer_i),
   .rst_downsizer_i(rst_downsizer_i),
+
+  // The XXXTargetIf (s) ports of the NI must be connected
+  // to YYYInitiatorIf (m) ports of the unit (processing element)
+  // that is going to use the provided network services
+  // and viceversa
 
   .s_axis_tvalid_i(m_axis_tvalid),
   .s_axis_tready_o(m_axis_tready),
@@ -125,6 +167,17 @@ single_unit_network_interface #(
   .m_axis_tid_o   (s_axis_tid),
   .m_axis_tdest_o (s_axis_tdest),
  
+  // Configuration and monitoring file register access interface
+  .filereg_s_tvalid_i(m_filereg_valid),
+  .filereg_s_tready_o(m_filereg_ready),
+  .filereg_s_tdata_i (m_filereg_data),
+  .filereg_s_tlast_i (m_filereg_last),
+  //
+  .filereg_m_tvalid_o(s_filereg_valid),
+  .filereg_m_tready_i(s_filereg_ready),
+  .filereg_m_tdata_o (s_filereg_data),
+  .filereg_m_tlast_o (s_filereg_last),
+
   .network_valid_o             (network_valid[NI2ROUTER]),
   .network_ready_i             (network_virtual_channel_ready),
   .network_flit_o              (network_flit[NI2ROUTER]),
@@ -254,15 +307,16 @@ SWITCH_VC #(
   .ValidBitToW (switch_valid[OUT][WEST]),
   
   // Configuration and monitoring file register access interface
-  .filereg_m_tvalid_i(1'b0),
-  .filereg_m_tdata_i (39'b0),
-  .filereg_m_tlast_i (1'b0),    //! port available but signal is not processed (safely ignored)
-  .filereg_m_tready_o(),     //! module can accpet requests
+  // filereg_m is filereg_s and filereg_s is filereg_m actually
+  .filereg_m_tvalid_i(s_filereg_valid),
+  .filereg_m_tdata_i (s_filereg_data),
+  .filereg_m_tlast_i (s_filereg_last),
+  .filereg_m_tready_o(s_filereg_ready),
   //
-  .filereg_s_tready_i(1'b0),
-  .filereg_s_tvalid_o(),
-  .filereg_s_tdata_o (),     //! register data and destination id to return the register data
-  .filereg_s_tlast_o ()      //! always active, this module expects single frame streams  
+  .filereg_s_tready_i(m_filereg_ready),
+  .filereg_s_tvalid_o(m_filereg_valid),
+  .filereg_s_tdata_o (m_filereg_data),
+  .filereg_s_tlast_o (m_filereg_last)
 );
 
 //// Connect the input/output ports of the tile with the Switch (Router)

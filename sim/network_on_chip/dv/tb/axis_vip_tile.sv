@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 //
 //
-// @file axis_vip_tile.v
+// @file axis_vip_tile.sv
 // @author Rafael Tornero (ratorga@disca.upv.es)
 // @date March 08th, 2024
 //
