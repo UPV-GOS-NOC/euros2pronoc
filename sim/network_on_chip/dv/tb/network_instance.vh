@@ -28,7 +28,7 @@ localparam integer FileRegInitiatorIfEnable = 0;
 localparam integer FileRegInitiatorIfTDataWidth = 32 + NetworkSwitchAddressIdWidth;
 
 // FileReg Target interface configuration. 0 to disable the interface and 1 to enable it. 
-localparam integer FileRegTargetIfEnable = 0;
+localparam integer FileRegTargetIfEnable = 1;
 
 // FileReg Target interface configuration. Size (in bits) of the TData port
 localparam integer FileRegTargetIfTDataWidth = 39;   
@@ -81,20 +81,20 @@ wire                                        switch_valid[0:1][0:3];
 wire [NetworkIfNumberOfVirtualChannels-1:0] switch_go[0:1][0:3];
 
 // AXI-Stream (Target) interface for PE connection
-wire                                   s_axis_tvalid;
-wire                                   s_axis_tready;
-wire [AxiStreamTargetIfTDataWidth-1:0] s_axis_tdata;
-wire                                   s_axis_tlast;
-wire [AxiStreamTargetIfTIdWidth-1:0]   s_axis_tid;
-wire [AxiStreamTargetIfTDestWidth-1:0] s_axis_tdest;
+wire                                   network_s_axis_tvalid;
+wire                                   network_s_axis_tready;
+wire [AxiStreamTargetIfTDataWidth-1:0] network_s_axis_tdata;
+wire                                   network_s_axis_tlast;
+wire [AxiStreamTargetIfTIdWidth-1:0]   network_s_axis_tid;
+wire [AxiStreamTargetIfTDestWidth-1:0] network_s_axis_tdest;
 
 // AXI-Stream (Initiator) interface for PE connection
-wire [AxiStreamInitiatorIfTDataWidth-1:0] m_axis_tdata;
-wire                                      m_axis_tvalid;
-wire                                      m_axis_tready;
-wire                                      m_axis_tlast;
-wire [AxiStreamInitiatorIfTIdWidth-1:0]   m_axis_tid;
-wire [AxiStreamInitiatorIfTDestWidth-1:0] m_axis_tdest; 
+wire [AxiStreamInitiatorIfTDataWidth-1:0] network_m_axis_tdata;
+wire                                      network_m_axis_tvalid;
+wire                                      network_m_axis_tready;
+wire                                      network_m_axis_tlast;
+wire [AxiStreamInitiatorIfTIdWidth-1:0]   network_m_axis_tid;
+wire [AxiStreamInitiatorIfTDestWidth-1:0] network_m_axis_tdest; 
 
 wire                                    m_filereg_valid;
 wire                                    m_filereg_ready;
@@ -153,19 +153,19 @@ single_unit_network_interface #(
   // that is going to use the provided network services
   // and viceversa
 
-  .s_axis_tvalid_i(m_axis_tvalid),
-  .s_axis_tready_o(m_axis_tready),
-  .s_axis_tdata_i (m_axis_tdata),
-  .s_axis_tlast_i (m_axis_tlast),
-  .s_axis_tid_i   (m_axis_tid),
-  .s_axis_tdest_i (m_axis_tdest),
+  .s_axis_tvalid_i(network_m_axis_tvalid),
+  .s_axis_tready_o(network_m_axis_tready),
+  .s_axis_tdata_i (network_m_axis_tdata),
+  .s_axis_tlast_i (network_m_axis_tlast),
+  .s_axis_tid_i   (network_m_axis_tid),
+  .s_axis_tdest_i (network_m_axis_tdest),
 
-  .m_axis_tvalid_o(s_axis_tvalid),
-  .m_axis_tready_i(s_axis_tready),
-  .m_axis_tdata_o (s_axis_tdata),
-  .m_axis_tlast_o (s_axis_tlast),
-  .m_axis_tid_o   (s_axis_tid),
-  .m_axis_tdest_o (s_axis_tdest),
+  .m_axis_tvalid_o(network_s_axis_tvalid),
+  .m_axis_tready_i(network_s_axis_tready),
+  .m_axis_tdata_o (network_s_axis_tdata),
+  .m_axis_tlast_o (network_s_axis_tlast),
+  .m_axis_tid_o   (network_s_axis_tid),
+  .m_axis_tdest_o (network_s_axis_tdest),
  
   // Configuration and monitoring file register access interface
   .filereg_s_tvalid_i(m_filereg_valid),

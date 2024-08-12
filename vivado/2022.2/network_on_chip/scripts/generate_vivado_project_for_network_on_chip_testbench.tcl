@@ -367,7 +367,7 @@ set_property -name "include_dirs" -value "[file normalize "/opt/Xilinx/Vivado/20
                                           [file normalize "${repo_dir}/vivado/2022.2/network_on_chip/sim"]" -objects $obj
 set_property -name "top" -value "tb" -objects $obj
 set_property -name "top_lib" -value "xil_defaultlib" -objects $obj
-set_property -name "xsim.simulate.xsim.more_options" -value "-sv_seed 12351" -objects $obj
+set_property -name "xsim.simulate.xsim.more_options" -value "-sv_seed 13" -objects $obj
 
 # Set 'utils_1' fileset object
 set obj [get_filesets utils_1]

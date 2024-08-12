@@ -25,34 +25,53 @@
 
 class network_on_chip_monitor #(
 );
-
-  axi4stream_vip_m_mst_t m_axis_manager_agent;
-  axi4stream_vip_s_slv_t m_axis_subordinate_agent;
+  protected int id = 0;
   
-  // Objects for IPC between monitor and scoreboard for the subordinate part
-  axi4stream_monitor_transaction m_axis_subordinate_transaction;
-  mailbox                        m_axis_subordinate_scoreboard_mbx;
+  protected int verbosity = 0;
 
-  function new(axi4stream_vip_m_mst_t axis_manager, 
-               axi4stream_vip_s_slv_t axis_subordinate,
-               mailbox axis_subordinate_monitor2scoreboard_mbx);
-    m_axis_manager_agent = axis_manager;
-    m_axis_subordinate_agent = axis_subordinate;
-    m_axis_subordinate_scoreboard_mbx = axis_subordinate_monitor2scoreboard_mbx;
+  axi4stream_vip_s_slv_t s_axis_agent;
+
+  network_on_chip_monitor_callback callback_sequence [$];  
+
+  function new(input axi4stream_vip_s_slv_t s_axis_agent,
+               input int id);
+    this.s_axis_agent = s_axis_agent;
+    this.id = id;
   endfunction
+  
+  //
+  // Getters and setters
+  //
+ 
+  function int get_id();
+    return id;
+  endfunction
+ 
+  function void set_verbosity(int verbosity);
+    this.verbosity = verbosity;
+  endfunction 
+ 
+   //
+   // Run and test methods
+   //
  
   // Gets the AXI-Stream (subordinate) interface port signals state and send it to the scoreboard
   // through a mailbox
-  task axis_subordinate_monitor();
+  task s_axis_monitor();
+    axi4stream_monitor_transaction item;
+
     forever begin
-      m_axis_subordinate_agent.monitor.item_collected_port.get(m_axis_subordinate_transaction);
-      m_axis_subordinate_scoreboard_mbx.put(m_axis_subordinate_transaction);
+      s_axis_agent.monitor.item_collected_port.get(item);
+
+      foreach(callback_sequence[i]) begin
+        callback_sequence[i].post_monitor(this, item);
+      end
     end
   endtask
   
   task run();
     fork
-      axis_subordinate_monitor();
+      s_axis_monitor();
     join_none
   endtask
   

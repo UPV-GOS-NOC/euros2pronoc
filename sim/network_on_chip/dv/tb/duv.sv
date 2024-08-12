@@ -4,20 +4,59 @@
 //
 // @file duv.sv
 // @author Rafael Tornero (ratorga@disca.upv.es)
-// @date March 08th, 2024
+// @date March 08th, 2024 (Initial version)
+// @date July 29th, 2024 (Major update)
 //
-// @title Design to verify the NoC
+// @title Design for NoC Verification
 //
-// The design is composed of several tiles layout
-// in a 2D grid. Each tile contains an AXI VIP 
-// (Manager or subordinate), a Single Unit
-// Network Interface and a NoC Router
+// The design is composed of several tiles allocated
+// in a 2D grid layout. The grid and the number of tiles
+// depend on module configuration parameters. 
+//
+// There is an AXI-Stream Manager VIP core, 
+// an AXI-Stream Manager VIP core, a Single Unit
+// Network Interface and a NoC Switch in each tile.
+//
+// The AXI-Stream Manager and subordinate VIP core mimic the tile PE
+// and, here, it is used basically for injecting 
+// AXI-Stream frames into the on-chip network through
+// the NI. 
+//
+// The simulation environment will configure one of
+// the AXI-Stream Manager VIP cores to act as a
+// NoC Controller and reconfigure routing algorithm
+// of network switches at runtime.
+//
+// In addition, the simulation environment will enable either the
+// AXIS Manager or AXIS subordinate VIP core per tile.
 //
 
 `timescale 1ns/1ns
 
+module duv #(
+  parameter integer AXIStreamTDataWidth = 0,
+  parameter integer AXIStreamTIdWidth   = 0,
+  parameter integer AXIStreamTDestWidth = 0,
 
-module duv (
+  // Size of the 2D Mesh topology, given by the 
+  // number of nodes in dimension X and Y respectively
+  // The Tile address are assigned from left to right and
+  // top to bottom
+  parameter  integer Mesh2DTopologyDimensionX = 0,
+  parameter  integer Mesh2DTopologyDimensionY = 0,
+  localparam integer NumberOfTiles = Mesh2DTopologyDimensionX * Mesh2DTopologyDimensionY,  
+
+  // NoC parameters
+  parameter integer NetworkSwitchAddressIdWidth    = 0, 
+  parameter integer NetworkFlitWidth               = 0,
+  parameter integer NetworkFlitTypeWidth           = 0,
+  parameter integer NetworkBroadcastWidth          = 0,
+  parameter integer NetworkNumberOfVirtualNetworks = 0,
+  parameter integer NetworkNumberOfVirtualChannels = 0,
+  parameter integer NetworkVirtualNetworkIdWidth   = 0, 
+  parameter integer NetworkVirtualChannelIdWidth   = 0
+
+) (
   // clocks and resets
   input clk_s_axis_i,
   input clk_m_axis_i,
@@ -32,47 +71,11 @@ module duv (
   input rst_downsizer_i
 );
 
-  `include "common_functions.vh"
-
-//
-// Gets the number of bits required to encode a value
-//
-// Params:
-//  value, the value to encode
-//
-// Returns:
-//  The number of bits required to encode value input param
-//
-function integer bitsize(integer value);
-  begin
-    if (value <= 1)
-      bitsize = 1;
-    else
-      bitsize = Log2(value);
-  end
-endfunction
-
-  localparam integer AXISTREAM_TDATA_WIDTH = 32;
-  localparam integer AXISTREAM_TID_WIDTH   = 5;
-  localparam integer AXISTREAM_TDEST_WIDTH = 11;
-  
-  localparam integer M_AXIS_TILE               = 2;
-  localparam integer MESH_TOPOLOGY_DIMENSION_X = 4;
-  localparam integer MESH_TOPOLOGY_DIMENSION_Y = 2;
-  localparam integer NUMBEROF_NODES            = MESH_TOPOLOGY_DIMENSION_X * MESH_TOPOLOGY_DIMENSION_Y;
-
-
-  localparam integer NETWORK_FLIT_WIDTH                = 64;
-  localparam integer NETWORK_FLIT_TYPE_WIDTH           = 2;
-  localparam integer NETWORK_BROADCAST_WIDTH           = 1;
-  localparam integer NETWORK_NUMBEROF_VIRTUAL_NETWORKS = 3;
-  localparam integer NETWORK_NUMBEROF_VIRTUAL_CHANNELS = 3;
-  localparam integer NETWORK_VIRTUAL_NETWORK_ID_WIDTH  = bitsize(NETWORK_NUMBEROF_VIRTUAL_NETWORKS);
-  localparam integer NETWORK_VIRTUAL_CHANNEL_ID_WIDTH  = bitsize(NETWORK_NUMBEROF_VIRTUAL_CHANNELS);
-  localparam integer NETWORK_DATA_WIDTH = NETWORK_FLIT_WIDTH +
-                                          NETWORK_FLIT_TYPE_WIDTH +
-                                          NETWORK_BROADCAST_WIDTH +
-                                          NETWORK_VIRTUAL_CHANNEL_ID_WIDTH;
+  // Size of the compound network signal 
+  localparam integer NetworkDataWidth = NetworkFlitWidth +
+                                        NetworkFlitTypeWidth +
+                                        NetworkBroadcastWidth +
+                                        NetworkVirtualChannelIdWidth;
   
   localparam integer NUMBEROF_SWITCH_PORTS = 4;
   
@@ -90,46 +93,47 @@ endfunction
   // First dimension: tiles or nodes in the topology
   // Second dimension: input and output signals (use IN and OUT constants to index this dimension)
   // Third dimension: data and control signals
-  wire [NUMBEROF_SWITCH_PORTS*NETWORK_DATA_WIDTH-1:0]                tile2tile_network_data[0:NUMBEROF_NODES-1][0:1];
-  wire [NUMBEROF_SWITCH_PORTS-1:0]                                   tile2tile_network_valid[0:NUMBEROF_NODES-1][0:1];
-  wire [NUMBEROF_SWITCH_PORTS*NETWORK_NUMBEROF_VIRTUAL_CHANNELS-1:0] tile2tile_network_go[0:NUMBEROF_NODES-1][0:1];
+  wire [NUMBEROF_SWITCH_PORTS*NetworkDataWidth-1:0]               tile2tile_network_data[0:NumberOfTiles-1][0:1];
+  wire [NUMBEROF_SWITCH_PORTS-1:0]                                tile2tile_network_valid[0:NumberOfTiles-1][0:1];
+  wire [NUMBEROF_SWITCH_PORTS*NetworkNumberOfVirtualChannels-1:0] tile2tile_network_go[0:NumberOfTiles-1][0:1];
 
 
 
 
   // Instance tiles
   generate
-    for (genvar i = 0; i < NUMBEROF_NODES; i = i+1) begin : tile
-      // Depending on the location of the tile in the 2D-mesh topology 
+    for (genvar i = 0; i < NumberOfTiles; i = i+1) begin : tile
+      // TODO Depending on the location of the tile in the 2D-mesh topology 
       // it will have a different number of ports to connect tiles among them
+      //
+      // For now, we will keep every router with four ports (NEWS)
       localparam SWITCH_NUMBEROF_PORTS = 4;
       
-      if (i == M_AXIS_TILE) begin : m_axis
       axis_vip_tile #(
         .NetworkSwitchAddressId     (i),
-        .NetworkSwitchAddressIdWidth(11),
+        .NetworkSwitchAddressIdWidth(NetworkSwitchAddressIdWidth),
         .NetworkSwitchNumberOfPorts (SWITCH_NUMBEROF_PORTS),
-        .MeshTopologyDimensionX     (MESH_TOPOLOGY_DIMENSION_X),
-        .MeshTopologyDimensionY     (MESH_TOPOLOGY_DIMENSION_Y),
+        .MeshTopologyDimensionX     (Mesh2DTopologyDimensionX),
+        .MeshTopologyDimensionY     (Mesh2DTopologyDimensionY),
 
-        .NetworkIfFlitWidth              (NETWORK_FLIT_WIDTH),
-        .NetworkIfFlitTypeWidth          (NETWORK_FLIT_TYPE_WIDTH),
-        .NetworkIfBroadcastWidth         (NETWORK_BROADCAST_WIDTH),
-        .NetworkIfVirtualNetworkIdWidth  (NETWORK_VIRTUAL_NETWORK_ID_WIDTH),
-        .NetworkIfVirtualChannelIdWidth  (NETWORK_VIRTUAL_CHANNEL_ID_WIDTH),
-        .NetworkIfNumberOfVirtualChannels(NETWORK_NUMBEROF_VIRTUAL_CHANNELS),
-        .NetworkIfNumberOfVirtualNetworks(NETWORK_NUMBEROF_VIRTUAL_NETWORKS),
-       
-        .AxiStreamTargetIfEnable    (0),
-        .AxiStreamTargetIfTDataWidth(1),
-        .AxiStreamTargetIfTIdWidth  (1),
-        .AxiStreamTargetIfTDestWidth(1),
+        .NetworkIfFlitWidth              (NetworkFlitWidth),
+        .NetworkIfFlitTypeWidth          (NetworkFlitTypeWidth),
+        .NetworkIfBroadcastWidth         (NetworkBroadcastWidth),
+        .NetworkIfVirtualNetworkIdWidth  (NetworkVirtualNetworkIdWidth),
+        .NetworkIfVirtualChannelIdWidth  (NetworkVirtualChannelIdWidth),
+        .NetworkIfNumberOfVirtualChannels(NetworkNumberOfVirtualChannels),
+        .NetworkIfNumberOfVirtualNetworks(NetworkNumberOfVirtualNetworks),
+         
+        .AxiStreamTargetIfEnable    (1),
+        .AxiStreamTargetIfTDataWidth(AXIStreamTDataWidth),
+        .AxiStreamTargetIfTIdWidth  (AXIStreamTIdWidth),
+        .AxiStreamTargetIfTDestWidth(AXIStreamTDestWidth),
 
         .AxiStreamInitiatorIfEnable    (1),
-        .AxiStreamInitiatorIfTDataWidth(AXISTREAM_TDATA_WIDTH),
-        .AxiStreamInitiatorIfTIdWidth  (AXISTREAM_TID_WIDTH),
-        .AxiStreamInitiatorIfTDestWidth(AXISTREAM_TDEST_WIDTH)
-       ) vip_inst (
+        .AxiStreamInitiatorIfTDataWidth(AXIStreamTDataWidth),
+        .AxiStreamInitiatorIfTIdWidth  (AXIStreamTIdWidth),
+        .AxiStreamInitiatorIfTDestWidth(AXIStreamTDestWidth)
+       ) axis_vip_inst (
         // CLKs AND RESETs
         .clk_s_axis_i   (clk_s_axis_i),
         .clk_m_axis_i   (clk_m_axis_i),
@@ -144,60 +148,13 @@ endfunction
         .rst_downsizer_i(rst_downsizer_i),
 
         .network_valid_i(tile2tile_network_valid[i][IN][SWITCH_NUMBEROF_PORTS-1:0]),
-        .network_go_o   (tile2tile_network_go[i][OUT][SWITCH_NUMBEROF_PORTS*NETWORK_NUMBEROF_VIRTUAL_CHANNELS-1:0]),
-        .network_data_i (tile2tile_network_data[i][IN][SWITCH_NUMBEROF_PORTS*NETWORK_DATA_WIDTH-1:0]),
+        .network_go_o   (tile2tile_network_go[i][OUT][SWITCH_NUMBEROF_PORTS*NetworkNumberOfVirtualChannels-1:0]),
+        .network_data_i (tile2tile_network_data[i][IN][SWITCH_NUMBEROF_PORTS*NetworkDataWidth-1:0]),
         .network_valid_o(tile2tile_network_valid[i][OUT][SWITCH_NUMBEROF_PORTS-1:0]),
-        .network_go_i   (tile2tile_network_go[i][IN][SWITCH_NUMBEROF_PORTS*NETWORK_NUMBEROF_VIRTUAL_CHANNELS-1:0]),
-        .network_data_o (tile2tile_network_data[i][OUT][SWITCH_NUMBEROF_PORTS*NETWORK_DATA_WIDTH-1:0])
+        .network_go_i   (tile2tile_network_go[i][IN][SWITCH_NUMBEROF_PORTS*NetworkNumberOfVirtualChannels-1:0]),
+        .network_data_o (tile2tile_network_data[i][OUT][SWITCH_NUMBEROF_PORTS*NetworkDataWidth-1:0])
       );
-      end else begin : s_axis
-      axis_vip_tile #(
-        .NetworkSwitchAddressId     (i),
-        .NetworkSwitchAddressIdWidth(11),
-        .NetworkSwitchNumberOfPorts (SWITCH_NUMBEROF_PORTS),
-        .MeshTopologyDimensionX     (MESH_TOPOLOGY_DIMENSION_X),
-        .MeshTopologyDimensionY     (MESH_TOPOLOGY_DIMENSION_Y),
-        
-        .NetworkIfFlitWidth              (NETWORK_FLIT_WIDTH),
-        .NetworkIfFlitTypeWidth          (NETWORK_FLIT_TYPE_WIDTH),
-        .NetworkIfBroadcastWidth         (NETWORK_BROADCAST_WIDTH),
-        .NetworkIfVirtualNetworkIdWidth  (NETWORK_VIRTUAL_NETWORK_ID_WIDTH),
-        .NetworkIfVirtualChannelIdWidth  (NETWORK_VIRTUAL_CHANNEL_ID_WIDTH),
-        .NetworkIfNumberOfVirtualChannels(NETWORK_NUMBEROF_VIRTUAL_CHANNELS),
-        .NetworkIfNumberOfVirtualNetworks(NETWORK_NUMBEROF_VIRTUAL_NETWORKS),
-       
-        .AxiStreamTargetIfEnable    (1),
-        .AxiStreamTargetIfTDataWidth(AXISTREAM_TDATA_WIDTH),
-        .AxiStreamTargetIfTIdWidth  (AXISTREAM_TID_WIDTH),
-        .AxiStreamTargetIfTDestWidth(AXISTREAM_TDEST_WIDTH),
-
-        .AxiStreamInitiatorIfEnable    (0),
-        .AxiStreamInitiatorIfTDataWidth(1),
-        .AxiStreamInitiatorIfTIdWidth  (1),
-        .AxiStreamInitiatorIfTDestWidth(1)
-      ) vip_inst (
-        // CLKs AND RESETS
-        .clk_s_axis_i   (clk_s_axis_i),
-        .clk_m_axis_i   (clk_m_axis_i),
-        .clk_network_i  (clk_network_i),
-        .clk_upsizer_i  (clk_upsizer_i),
-        .clk_downsizer_i(clk_downsizer_i),
-
-        .rst_s_axis_ni  (rst_s_axis_ni),
-        .rst_m_axis_ni  (rst_m_axis_ni),
-        .rst_network_i  (rst_network_i),
-        .rst_upsizer_i  (rst_upsizer_i),
-        .rst_downsizer_i(rst_downsizer_i),
-
-        .network_valid_i(tile2tile_network_valid[i][IN][SWITCH_NUMBEROF_PORTS-1:0]),
-        .network_go_o   (tile2tile_network_go[i][OUT][SWITCH_NUMBEROF_PORTS*NETWORK_NUMBEROF_VIRTUAL_CHANNELS-1:0]),
-        .network_data_i (tile2tile_network_data[i][IN][SWITCH_NUMBEROF_PORTS*NETWORK_DATA_WIDTH-1:0]),
-        .network_valid_o(tile2tile_network_valid[i][OUT][SWITCH_NUMBEROF_PORTS-1:0]),
-        .network_go_i   (tile2tile_network_go[i][IN][SWITCH_NUMBEROF_PORTS*NETWORK_NUMBEROF_VIRTUAL_CHANNELS-1:0]),
-        .network_data_o (tile2tile_network_data[i][OUT][SWITCH_NUMBEROF_PORTS*NETWORK_DATA_WIDTH-1:0])
-      );
-      end
-    end
+    end : tile
   endgenerate
   
   // Interconnect tiles following a 2D-mesh topology
@@ -205,39 +162,39 @@ endfunction
   
     `define CONNECT_TILE_TO_TILE(REF_TILE, REF_PORT, TARGET_TILE, TARGET_PORT) \
         localparam integer OFFSETOF_TARGET_PORT = get_2dmesh_switch_port(TARGET_TILE, \
-            TARGET_PORT, MESH_TOPOLOGY_DIMENSION_X, MESH_TOPOLOGY_DIMENSION_Y); \
+            TARGET_PORT, Mesh2DTopologyDimensionX, Mesh2DTopologyDimensionY); \
         localparam integer OFFSETOF_REF_PORT = get_2dmesh_switch_port(REF_TILE,\
-            REF_PORT, MESH_TOPOLOGY_DIMENSION_X, MESH_TOPOLOGY_DIMENSION_Y); \
+            REF_PORT, Mesh2DTopologyDimensionX, Mesh2DTopologyDimensionY); \
         assign tile2tile_network_valid[TARGET_TILE][IN][OFFSETOF_TARGET_PORT] = tile2tile_network_valid[REF_TILE][OUT][OFFSETOF_REF_PORT]; \
-        assign tile2tile_network_go[TARGET_TILE][IN][OFFSETOF_TARGET_PORT*NETWORK_NUMBEROF_VIRTUAL_CHANNELS +: NETWORK_NUMBEROF_VIRTUAL_CHANNELS] = \
-            tile2tile_network_go[REF_TILE][OUT][OFFSETOF_REF_PORT*NETWORK_NUMBEROF_VIRTUAL_CHANNELS +: NETWORK_NUMBEROF_VIRTUAL_CHANNELS]; \
-        assign tile2tile_network_data[TARGET_TILE][IN][OFFSETOF_TARGET_PORT*NETWORK_DATA_WIDTH +: NETWORK_DATA_WIDTH] = \
-            tile2tile_network_data[REF_TILE][OUT][OFFSETOF_REF_PORT*NETWORK_DATA_WIDTH +: NETWORK_DATA_WIDTH];
+        assign tile2tile_network_go[TARGET_TILE][IN][OFFSETOF_TARGET_PORT*NetworkNumberOfVirtualChannels +: NetworkNumberOfVirtualChannels] = \
+            tile2tile_network_go[REF_TILE][OUT][OFFSETOF_REF_PORT*NetworkNumberOfVirtualChannels +: NetworkNumberOfVirtualChannels]; \
+        assign tile2tile_network_data[TARGET_TILE][IN][OFFSETOF_TARGET_PORT*NetworkDataWidth +: NetworkDataWidth] = \
+            tile2tile_network_data[REF_TILE][OUT][OFFSETOF_REF_PORT*NetworkDataWidth +: NetworkDataWidth];
          
     for (genvar tile_id = 0; 
-                tile_id < (MESH_TOPOLOGY_DIMENSION_X * MESH_TOPOLOGY_DIMENSION_Y);
+                tile_id < (Mesh2DTopologyDimensionX * Mesh2DTopologyDimensionY);
                 tile_id = tile_id + 1) begin : tile2tile_connectivity
       
       // South to North connections
-      if (tile_id < (MESH_TOPOLOGY_DIMENSION_Y - 1) * MESH_TOPOLOGY_DIMENSION_X) begin : south2north
+      if (tile_id < (Mesh2DTopologyDimensionY - 1) * Mesh2DTopologyDimensionX) begin : south2north
         // It is not the last row
-        `CONNECT_TILE_TO_TILE(tile_id, SOUTH, tile_id + MESH_TOPOLOGY_DIMENSION_X, NORTH)
+        `CONNECT_TILE_TO_TILE(tile_id, SOUTH, tile_id + Mesh2DTopologyDimensionX, NORTH)
       end
       
       // North to South connections
-      if (tile_id >= MESH_TOPOLOGY_DIMENSION_X) begin : north2south
+      if (tile_id >= Mesh2DTopologyDimensionX) begin : north2south
         // It is not the first row
-        `CONNECT_TILE_TO_TILE(tile_id, NORTH, tile_id - MESH_TOPOLOGY_DIMENSION_X, SOUTH)
+        `CONNECT_TILE_TO_TILE(tile_id, NORTH, tile_id - Mesh2DTopologyDimensionX, SOUTH)
       end
      
       // East to west connections
-      if (tile_id % MESH_TOPOLOGY_DIMENSION_X != MESH_TOPOLOGY_DIMENSION_X - 1) begin : east2west
+      if (tile_id % Mesh2DTopologyDimensionX != Mesh2DTopologyDimensionX - 1) begin : east2west
         // it is not the last column
         `CONNECT_TILE_TO_TILE(tile_id, EAST, tile_id + 1, WEST)
       end
     
       // West to East connections
-      if (tile_id % MESH_TOPOLOGY_DIMENSION_X != 0) begin : west2east
+      if (tile_id % Mesh2DTopologyDimensionX != 0) begin : west2east
         // it is not the first column
         `CONNECT_TILE_TO_TILE(tile_id, WEST, tile_id - 1, EAST)
       end

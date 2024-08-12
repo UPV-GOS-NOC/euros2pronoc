@@ -9,75 +9,69 @@
 // @title Network-on-Chip base test
 //
 
-import axi4stream_vip_pkg::*;
 import network_on_chip_env_pkg::*;
 
-program network_on_chip_base_test
-(
-  axi4stream_vip_if m_axis_vip_if,
-  axi4stream_vip_if s_axis_vip_if
+program network_on_chip_base_test #(
+  parameter int NumberOfTiles = 0
+) (
 );
   
-//  covergroup network_if_coverage () @(posedge tb.duv_inst.\tile[0].s_axis.vip_inst .network_interface_inst.clk_network_i);
+
+  // These arrays contains the interfaces of the VIP cores
+  // and are used by the Driver and monitor to drive transaction
+  // into the cores, which will convert into AXI-Stream transfers
+  // for driving the NI.
+  m_axis_vip_vif_t m_axis_vip_vif[0:NumberOfTiles-1];  
+  s_axis_vip_vif_t s_axis_vip_vif[0:NumberOfTiles-1];
   
-//    c_network_packet_size: coverpoint tb.duv_inst.\tile[0].s_axis.vip_inst .network_interface_inst.network_flit_type_i iff (tb.duv_inst.\tile[0].s_axis.vip_inst .network_interface_inst.network_valid_i) {
-//      bins single_flit_packet = (2'b11[*2:3]);
-//      bins short_packet = (2'b00 => 2'b01[*0:5] => 2'b10);
-//      bins long_packet = (2'b00 => 2'b01[*5:20] => 2'b10);
-//      bins switch_packet[] = (2'b10, 2'b11 => 2'b00, 2'b11);
-//      illegal_bins body_after_tail[] = (2'b11, 2'b10 => 2'b01);
-//      illegal_bins ht_after_body_or_header[] = (2'b01, 2'b00 => 2'b11);
-//    }
+  network_on_chip_controller_tile_is_zero_env_cfg env_cfg;
+  
+  network_on_chip_env #(
+    .NumberOfTiles(NumberOfTiles)
+  ) env;  
     
-//    c_flit_content: coverpoint tb.duv_inst.\tile[0].s_axis.vip_inst .network_interface_inst.network_flit_i iff (tb.duv_inst.\tile[0].s_axis.vip_inst .network_interface_inst.network_valid_i) {
-//      bins padding_tail_flit  = { 64'hFF000000_00000000 };
-//      wildcard bins tail_flit = { 64'hF0000000_XXXXXXXX };
-//      bins allothers = default;
-//    }
-       
-//    c_virtual_network_used: coverpoint tb.duv_inst.\tile[0].s_axis.vip_inst .network_interface_inst.network_virtual_network_id_i iff (tb.duv_inst.\tile[0].s_axis.vip_inst .network_interface_inst.network_valid_i) { 
-//      bins virtual_netword_id[] = {0, 1, 2};
-//      illegal_bins allothers = default;
-//    }
-//  endgroup
-  
-//  covergroup axis_upsizer_coverage () @(posedge tb.duv_inst.\tile[0].s_axis.vip_inst .network_interface_inst.clk_upsizer_i);
     
-//    c_capture_bytes_in_word: coverpoint tb.duv_inst.\tile[0].s_axis.vip_inst .network_interface_inst.\axis_initiator_if.network_unit_decoupler_inst .upsizer_inst.s_axis_tvalid {
-//      bins correct_transitions[] = (0 => 1 => 1 => 1 => 1 => 0), (0 => 1 => 1 => 1 => 0), (0 => 1 => 0);
-//    }
-     
-//  endgroup
+  generate
+    for (genvar i = 0; i < NumberOfTiles; i++) begin
+      initial begin
+        m_axis_vip_vif[i] = tb.duv_inst.tile[i].axis_vip_inst.network_m_axis_vip.inst.inst.IF;
+        s_axis_vip_vif[i] = tb.duv_inst.tile[i].axis_vip_inst.network_s_axis_vip.inst.inst.IF;
+      end
+    end
+  endgenerate
   
-  network_on_chip_env env;  
     
   initial begin
+    #10;
     
-    //network_if_coverage net_cov = new();
-    //axis_upsizer_coverage axis_cov = new();
+    env = new(m_axis_vip_vif, s_axis_vip_vif);
     
-    env = new(m_axis_vip_if, s_axis_vip_if);
-    env.generator.total_transactions = 5000;
-    env.driver.verbosity = 0; // 1 for full verbosity
-
-    $display("[T=%0t] [Test] NoC Verification", $time);
+    // Constraint the noc controller tile to tile 0 and avoid as initiator and target
+    // of data streams tiles 0 and 4 in a 4x2 mesh. This is a wraparound solution
+    // to test the reconfiguration algorithm from XY to YX. Currently the controller tile
+    // cannot be reconfigured itself,so the traffic in its column must be suprimed.  
+    env_cfg = new(NumberOfTiles, NETWORK_NUMBEROF_VIRTUAL_NETWORKS);
+    env.cfg = env_cfg;
+    //env.cfg.c_at_least_one_message_per_manager_tile.constraint_mode(0);
     
-    //env.m_axis_manager_agent.set_verbosity(400);
-    env.m_axis_manager_agent.start_master();
-    env.m_axis_subordinate_agent.start_slave();
-
+    env.generate_configuration();
+    //  1. Total Number of transactions and per tile
+    //  2. NoC Controller tile
+    //  3. Control and status virtual network
+    //  5. Tiles with M_AXIS_VIP enabled
+    //  6. Tiles with S_AXIS_VIP enabled
+    //
+    env.build();
+    //
+    env.set_generator_verbosity(200);
+    env.set_driver_verbosity(1);
+    env.set_monitor_verbosity(0);
+    env.set_scoreboard_verbosity(1);
+    env.set_verbosity(1);
+    
+    $display("[T=%0t] [Test] NoC Verification with seed=N/A", $time);
+    
     env.run();
-    if (env.scoreboard.error_counter > 0) begin
-      $display("TEST FAIL (%0d errors)", env.scoreboard.error_counter);
-    end else begin 
-      $display("TEST PASSED");
-    end
-    
-    env.m_axis_manager_agent.stop_master();
-    env.m_axis_subordinate_agent.stop_slave();    
-    
-    //$display("NET Coverage = %0.2f %%", net_cov.get_coverage());
-    //$display("AXIS Coverage = %0.2f %%", axis_cov.get_coverage());    
     
     $finish;
   end

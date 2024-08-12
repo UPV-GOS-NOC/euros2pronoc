@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 //
 //
-// @file network_on_chip_driver.sv 
+// @file network_on_chip_driver.sv
 // @author Rafael Tornero (ratorga@disca.upv.es)
 // @date March 20th, 2024
 //
@@ -24,87 +24,123 @@
 
 class network_on_chip_driver #(
 );
-  
-  int numberof_m_axis_frames_transmitted = 0;  
-  
-  // AXI-Stream Manager and Subordinate VIP agents
+  protected int id = 0;
+
+  // AXI-Stream Manager VIP agent
   // Given by AXI VIP Vivado IP Core
-  axi4stream_vip_m_mst_t m_axis_manager_agent;
-  axi4stream_vip_s_slv_t m_axis_subordinate_agent;
+  axi4stream_vip_m_mst_t m_axis_agent;
 
-  // Mailboxes for IPC between the generator and the driver
-  mailbox m_axis_manager_generator_mbx;
-  mailbox m_axis_subordinate_generator_mbx;
-  
-  // Mailbox for IPC between driver and scoreboard to send the
-  // reference model for the transmit and receiver channels
-  mailbox m_axis_manager_scoreboard_mbx;
+  // Queue for callback methods
+  network_on_chip_driver_callback callback_sequence[$];
 
-  int verbosity = 0;
+  // Mailbox for IPC between the generator and the driver
+  protected mailbox generator2driver_mbx;
 
-  function new(axi4stream_vip_m_mst_t axis_manager,
-               axi4stream_vip_s_slv_t axis_subordinate,
-               mailbox axis_manager_generator2driver_mbx,
-               mailbox axis_subordinate_generator2driver_mbx,
-               mailbox axis_manager_driver2scoreboard_mbx);
-    m_axis_manager_agent = axis_manager;
-    m_axis_subordinate_agent = axis_subordinate;
-    m_axis_manager_generator_mbx = axis_manager_generator2driver_mbx;
-    m_axis_subordinate_generator_mbx = axis_subordinate_generator2driver_mbx;
-    m_axis_manager_scoreboard_mbx = axis_manager_driver2scoreboard_mbx;
+  protected event driver2generator;
+
+  protected int verbosity = 0;
+
+  protected int tile_noc_controller = 0;
+
+  int numberof_m_axis_frames_transmitted = 0;
+
+  function new(input axi4stream_vip_m_mst_t m_axis_agent,
+               input mailbox generator2driver_mbx,
+               input event driver2generator,
+               input int tile_noc_controller,
+               input int id);
+    this.m_axis_agent = m_axis_agent;
+    this.generator2driver_mbx = generator2driver_mbx;
+    this.driver2generator = driver2generator;
+    this.tile_noc_controller = tile_noc_controller;
+    this.id = id;
   endfunction
 
+  //
+  // Setters and getters
+  //
+
+  function void set_verbosity(int verbosity);
+    this.verbosity = verbosity;
+  endfunction
+
+  function int get_id();
+    return id;
+  endfunction
+
+  //
+  // Run and test
+  //
+
   task reset();
+    m_axis_agent.driver.vif_proxy.wait_areset_deassert();
+    
+    if (verbosity != 0) begin
+      $display("[T=%0t] [Driver Tile %0d] Reset completed!!!",
+               $time, id);
+    end    
   endtask
 
   // Drives transactions to the AXI-Stream interface of the NI
   // using the AXI-Stream Manager VIP.
   // Transactions are got from the generator
-  task axis_manager_driver();
-    forever begin
-      axi4stream_transaction item;
-      
-      m_axis_manager_generator_mbx.get(item);
-          
-      m_axis_manager_scoreboard_mbx.put(item);
+  task m_axis_driver();
+    axi4stream_transaction item;
+    int numberof_transaction = 0;
 
-      m_axis_manager_agent.driver.send(item);
-      
+    forever begin : loop_ever
+      generator2driver_mbx.get(item);
+      numberof_transaction++;
+
+      foreach(callback_sequence[i]) begin
+        callback_sequence[i].pre_drive(this, item);
+      end
+
       if (verbosity != 0) begin
-        $display("[T=%0t] [Driver] AXI-Stream Manager transaction send to DUV. tid=%0d, tdest=%0d, tlast=%b", 
-                 $time,
+        $display("[T=%0t] [Driver Tile %0d] AXI-Stream Manager transaction %0d send to DUV. tid=%0d, tdest=%0d, tlast=%b",
+                 $time, id,
+                 numberof_transaction,
                  item.get_id(),
                  item.get_dest(),
                  item.get_last());
       end
       
+      m_axis_agent.driver.send(item);
+
       if (item.get_last() == 1) begin
         numberof_m_axis_frames_transmitted++;
-        
+
         if (verbosity != 0) begin
-          $display("[T=%0t] [Driver] numberof_axis_frames_transmitted=%0d", 
-                   $time,
+          $display("[T=%0t] [Driver Tile %0d] numberof_axis_frames_transmitted=%0d",
+                   $time, id,
                    numberof_m_axis_frames_transmitted);
         end
-      end      
-    end
+      end
+
+      foreach(callback_sequence[i]) begin
+        callback_sequence[i].post_drive(this, item);
+      end
+
+     // wait for network routing reconfiguration
+     // which should start at 55000 ns, but the packet must be completely transmited (tlast == 1)
+     if (($time > 40000) && ($time < 200000) && (tile_noc_controller != id) && (item.get_last() == 1)) begin
+       if (verbosity != 0) begin
+         $display("[T=%0t] [Driver Tile %0d] Wait Router Reconfiguration for 10000 ns", $time, id);
+       end
+       # 165000;
+       if (verbosity != 0) begin
+         $display("[T=%0t] [Driver Tile %0d] Assuming Router Reconfiguration done!!!", $time, id);
+       end       
+     end
+
+      -> driver2generator;
+
+    end : loop_ever
   endtask
-  
-  // Drives transactions to the AXI-Stream interface of the NI
-  // using the AXI-Stream Subordinate VIP
-  // Transactions are got from the generator
-  task axis_subordinate_driver();
-    forever begin
-      axi4stream_ready_gen item;
-      m_axis_subordinate_generator_mbx.get(item);
-      m_axis_subordinate_agent.driver.send_tready(item);
-    end
-  endtask
-  
+
   task run();
     fork
-      axis_manager_driver();
-      axis_subordinate_driver();
+      m_axis_driver();
     join_none
   endtask
 

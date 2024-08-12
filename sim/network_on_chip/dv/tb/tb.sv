@@ -29,11 +29,11 @@
 
 `timescale 1ns/1ns
 
-import axi4stream_vip_pkg::*;
-import axi4stream_vip_m_pkg::*;
-import axi4stream_vip_s_pkg::*;
+import network_on_chip_env_pkg::*;
 
 module tb();
+  
+  parameter int NumberOfTiles = NUMBEROF_TILES; 
 
   localparam int CLK_NETWORK_PERIOD   = 20;
   localparam int CLK_M_AXIS_PERIOD    = 40;
@@ -53,6 +53,21 @@ module tb();
   bit rst_downsizer = 1;
 
   duv #(
+    .AXIStreamTDataWidth(AXISTREAM_TDATA_WIDTH),
+    .AXIStreamTIdWidth  (AXISTREAM_TID_WIDTH),
+    .AXIStreamTDestWidth(AXISTREAM_TDEST_WIDTH),
+
+    .Mesh2DTopologyDimensionX(MESH2D_TOPOLOGY_DIMENSIONX),
+    .Mesh2DTopologyDimensionY(MESH2D_TOPOLOGY_DIMENSIONY),
+
+    .NetworkSwitchAddressIdWidth   (NETWORK_SWITCH_ADDRESS_ID_WIDTH),
+    .NetworkFlitWidth              (NETWORK_FLIT_WIDTH),
+    .NetworkFlitTypeWidth          (NETWORK_FLIT_TYPE_WIDTH),
+    .NetworkBroadcastWidth         (NETWORK_BROADCAST_WIDTH),
+    .NetworkNumberOfVirtualNetworks(NETWORK_NUMBEROF_VIRTUAL_NETWORKS),
+    .NetworkNumberOfVirtualChannels(NETWORK_NUMBEROF_VIRTUAL_CHANNELS),
+    .NetworkVirtualNetworkIdWidth  (NETWORK_VIRTUAL_NETWORK_ID_WIDTH),
+    .NetworkVirtualChannelIdWidth  (NETWORK_VIRTUAL_CHANNEL_ID_WIDTH)
   ) duv_inst (
      // clocks and resets
     .clk_s_axis_i   (clk_s_axis),
@@ -66,11 +81,11 @@ module tb();
     .rst_network_i  (rst_network),
     .rst_upsizer_i  (rst_upsizer),
     .rst_downsizer_i(rst_downsizer)
-  );
-  
+  );    
+
   network_on_chip_base_test #(
-  ) t0(duv_inst.\tile[2].m_axis.vip_inst .\m_axis_vip.inst .inst.IF, 
-       duv_inst.\tile[0].s_axis.vip_inst .\s_axis_vip.inst .inst.IF);    
+    .NumberOfTiles(NumberOfTiles)
+  ) t0();
 
   
   always begin
