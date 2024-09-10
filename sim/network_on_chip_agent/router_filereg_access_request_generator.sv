@@ -80,9 +80,10 @@ class router_filereg_access_request_generator extends network_on_chip_generator;
       $display("[T=%0t] [Generator Tile %0d] Start generating transactions for routing algorithm reconfiguration", $time, id);
     end
 
-    // Renconfigure VN2 and VN3 to YX
-    for(int i = 1; i < 8; i++) begin : loop_i
-      for (int j = 1; j < 4; j++) begin : loop_j
+    // Renconfigure VN0, VN1, VN2 and VN3 to YX, but writes to VN0 must not be updated since it is the config network
+    // and then their registers are write-protected
+    for(int i = 0; i < 8; i++) begin : loop_i
+      for (int j = 0; j < 4; j++) begin : loop_j
         axi4stream_transaction item_2;
         axi4stream_transaction item_1 = m_axis_agent.driver.create_transaction("axis_manager_config_transaction");
         request_filereg_item_t cfg_transaction = new();

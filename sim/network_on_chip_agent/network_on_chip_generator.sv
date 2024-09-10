@@ -119,13 +119,16 @@ class network_on_chip_generator;
         next_transfer_belong_to_same_axiframe = 1;
 
         // Transfer cannot be for the same tile, use the control and status virtual network and
-        // addressed to a other Manager tile
+        // addressed to a other Manager or noc controller tile
         do begin
           WR_TRANSACTION_FAIL: assert(item.randomize());
           // hack: going to the same destination through the different VN is not allowed
           item.set_id(1);
           vn = item.get_id() % 4;
-        end while ((item.get_dest() == id) || (vn == control_and_status_virtual_network) || (tile_types[item.get_dest()] == 0));
+        end while ((item.get_dest() == id) || 
+                   (vn == control_and_status_virtual_network) || 
+                   (tile_types[item.get_dest()] == 0) || 
+                   (item.get_dest() == 0));
         
         tdest_axiframe = item.get_dest();
         tid_axiframe = item.get_id();

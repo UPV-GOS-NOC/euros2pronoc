@@ -20,6 +20,21 @@ class network_on_chip_env_cfg;
   // Total AXIS transfers to generate 
   rand bit[31:0] total_messages;
 
+  // 0 = manager, 1 = subordinate
+  rand bit tile_type[];
+
+  // Number of messages generated per tile
+  rand bit [31:0] messages_per_tile[];
+  
+  // Control and status virtual network
+  rand bit [7:0] control_and_status_virtual_network;
+  
+  // enable a noc controller
+  rand bit[31:0] tile_noc_controller;  
+
+  // Policy for ready generation 
+  rand bit [2:0] ready_policy[];
+
   constraint c_minimum_numberof_messages {
     total_messages > 0;
   }
@@ -28,9 +43,6 @@ class network_on_chip_env_cfg;
     total_messages < 5000;
   }
 
-  // 0 = manager, 1 = subordinate
-  rand bit tile_type[];
-
   constraint c_at_least_two_tile_type_subordinate {
     tile_type.sum() > 1;
   }
@@ -38,54 +50,25 @@ class network_on_chip_env_cfg;
   constraint c_tile_at_least_a_type_manager {
     tile_type.sum() < numberof_tiles;
   }
-
-  // enable a noc controller
-  rand bit[31:0] tile_noc_controller;
  
   constraint c_tile_noc_controller_valid {
     tile_noc_controller < numberof_tiles;   
   }
 
-  // Control and status virtual network
-  rand bit [7:0] control_and_status_virtual_network;
-
   constraint c_control_and_status_virtual_network_valid {
     control_and_status_virtual_network < numberof_virtual_networks;
   }
 
-  // Number of messages generated per tile
-  rand bit [31:0] messages_per_tile[];
-
   constraint c_sum_messages {
     messages_per_tile.sum() == total_messages;
   }
-
-  constraint c_order_message {
-    solve total_messages before messages_per_tile;
-  }
  
   constraint c_order_type_and_message {
-    solve tile_type before messages_per_tile;
     foreach(messages_per_tile[i]) {
-      solve tile_type[i] before messages_per_tile[i];
+      //solve tile_type[i] before messages_per_tile[i];
+      (tile_type[i] == 1) -> (messages_per_tile[i] == 0);
     }
   }
-  
-  constraint c_subodinate_tiles_do_not_generate_transactions {
-    foreach(messages_per_tile[i]) {    
-      tile_type[i] == 1 -> messages_per_tile[i] == 0;
-    }
-  }  
-
-//  constraint c_at_least_one_message_per_manager_tile {
-//    foreach(messages_per_tile[i]) {    
-//      tile_type[i] == 0 -> messages_per_tile[i] inside { [1:total_messages] };
-//    }
-//  }
-
-  
-  // Policy for ready generation 
-  rand bit [2:0] ready_policy[];
   
 
   function new(int numberof_tiles, int numberof_virtual_networks);

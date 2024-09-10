@@ -16,12 +16,8 @@
 
 class network_on_chip_controller_tile_is_zero_env_cfg extends network_on_chip_env_cfg;
 
-  constraint c_tile_0_manager {
-    tile_type[0] == 0;
-  }
-  
-  constraint c_tile_4_manager {
-    tile_type[4] == 0;
+  constraint c_tile_0_type_controller {
+    tile_type[0] == 1;
   }
   
   constraint c_tile_noc_controller_zero {
@@ -30,21 +26,6 @@ class network_on_chip_controller_tile_is_zero_env_cfg extends network_on_chip_en
   
   constraint c_control_and_status_virtual_network_is_zero {
     control_and_status_virtual_network == 0;
-  }  
- 
-  
-  constraint c_messages_per_manager_tile_relaxed {
-    foreach(messages_per_tile[i]) {    
-      tile_type[i] == 0 -> messages_per_tile[i] inside { [0:total_messages] };
-    }
-  }
-  
-  constraint c_tile_0_do_not_generate_transactions {
-    messages_per_tile[0] == 0;
-  }
-  
-  constraint c_tile_4_do_not_generate_transactions {
-    messages_per_tile[4] == 0;
   }  
   
   function new(int numberof_tiles, int numberof_virtual_networks);

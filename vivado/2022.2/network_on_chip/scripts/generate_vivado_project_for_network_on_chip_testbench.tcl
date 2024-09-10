@@ -34,6 +34,7 @@
 #    NI:
 #    "<repo_dir>/rtl/misc/axis_2_native_fifo.v"
 #    "<repo_dir>/rtl/common/axis_converter_signals.v"
+#    "<repo_dir>/rtl/common/fixed_priority_arbiter_with_hold.v"
 #    "<repo_dir>/rtl/network_interface/axis_data_downsizer.v"
 #    "<repo_dir>/rtl/network_interface/axis_data_upsizer.v"
 #    "<repo_dir>/rtl/network_interface/filereg_fromnet.v"
@@ -44,14 +45,15 @@
 #    "<repo_dir>/rtl/misc/fifo_type_1_async_axis_wrapper.v"
 #    "<repo_dir>/rtl/misc/native_fifo_2_axi.v"
 #    "<repo_dir>/rtl/network_interface/network_data_axis_downsizer.v"
+#    "<repo_dir>/rtl/network_interface/network_injector.v"
 #    "<repo_dir>/rtl/network_interface/network_ejector.v"
 #    "<repo_dir>/rtl/network_interface/network_signal_converter.v"
+#    "<repo_dir>/rtl/network_interface/validready2noc_handshake_adapter.v"
 #    "<repo_dir>/rtl/network_interface/noc_outport_handshake_adapter.v"
 #    "<repo_dir>/rtl/network_interface/noc_packet_creator.v"
 #    "<repo_dir>/rtl/common/fifo_type_1_async/rd_ptr_empty.v"
 #    "<repo_dir>/rtl/network_interface/network_on_chip.v"
 #    "<repo_dir>/rtl/common/fifo_type_1_async/sync.v"
-#    "<repo_dir>/rtl/network_interface/validready2noc_handshake_adapter.v"
 #    "<repo_dir>/rtl/common/fifo_type_1_async/wr_ptr_full.v"
 #
 #    ROUTER:
@@ -177,6 +179,7 @@ puts "  proj_name: ${_xil_proj_name_}\n"
 set source_files_to_add [list \
  [file normalize "${repo_dir}/rtl/misc/axis_2_native_fifo.v"] \
  [file normalize "${repo_dir}/rtl/common/axis_converter_signals.v"] \
+ [file normalize "${repo_dir}/rtl/common/fixed_priority_arbiter_with_hold.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/axis_data_downsizer.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/axis_data_upsizer.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/filereg_fromnet.v"] \
@@ -187,6 +190,7 @@ set source_files_to_add [list \
  [file normalize "${repo_dir}/rtl/misc/fifo_type_1_async_axis_wrapper.v"] \
  [file normalize "${repo_dir}/rtl/misc/native_fifo_2_axi.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/network_data_axis_downsizer.v"] \
+ [file normalize "${repo_dir}/rtl/network_interface/network_injector.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/network_ejector.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/network_signal_converter.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/noc_outport_handshake_adapter.v"] \
@@ -367,7 +371,7 @@ set_property -name "include_dirs" -value "[file normalize "/opt/Xilinx/Vivado/20
                                           [file normalize "${repo_dir}/vivado/2022.2/network_on_chip/sim"]" -objects $obj
 set_property -name "top" -value "tb" -objects $obj
 set_property -name "top_lib" -value "xil_defaultlib" -objects $obj
-set_property -name "xsim.simulate.xsim.more_options" -value "-sv_seed 13" -objects $obj
+set_property -name "xsim.simulate.xsim.more_options" -value "-sv_seed 12345" -objects $obj
 
 # Set 'utils_1' fileset object
 set obj [get_filesets utils_1]
