@@ -83,6 +83,10 @@ module filereg #(
 
   parameter integer NumberOfPorts = 0,  //! number of ports in the router N-E-W-S-L
   parameter integer NumberOfVNs   = 1,
+
+  // Id of the virtual network used as a control and status network
+  parameter integer ControlAndStatusVirtualNetworkId = 0,
+
   //
   //parameter LBDRNumberOfRoutingBits      = 12,
   //parameter LBDRNumberOfConnectivityBits = 4,
@@ -123,7 +127,8 @@ module filereg #(
   output  [LBDRBitsPortWidth-1:0]   lbdr_bits_bus_o    //! lbdr configuration bits. All bits of all VNs
   // stats input: flits crossing the ports flag
   // stats output: flits crossing the ports, input bypass
-  );
+);
+      
 
   // tlast ports currently not processed
   // input is ignored
@@ -379,12 +384,16 @@ module filereg #(
         if ( i < NumberOfVNs) begin
           FileRegisterArray[i] = {{(FileRegEntryWidth - LBDRNumberOfBits){1'b0}}, lbdr_entry_default};
         end else begin
-          FileRegisterArray[i] = {(FileRegEntryWidth){1'b0}};
+          if (i != `FILEREG_ENTRY_CSR_VN) begin
+            FileRegisterArray[i] = {(FileRegEntryWidth){1'b0}};
+          end else begin
+            FileRegisterArray[i] = ControlAndStatusVirtualNetworkId;
+          end
         end
       end
     end else begin
       if (filereg_m_tvalid_i && filereg_m_tready_o) begin
-        if (current_operation_command == `FILEREG_COMMAND_WRITE) begin
+        if ((current_operation_command == `FILEREG_COMMAND_WRITE) && (current_operation_entry_id != FileRegisterArray[`FILEREG_ENTRY_CSR_VN])) begin
           FileRegisterArray[current_operation_entry_id] <= current_operation_data;
         end
       end
