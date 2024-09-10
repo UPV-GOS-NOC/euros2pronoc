@@ -77,6 +77,8 @@
 
 `timescale 1ns/1ns
 
+`include "net_common.h"
+
 module single_unit_network_interface #(
   parameter integer NetworkIfAddressId               = 0,  // Network configuration. Address identifier for this network interface
   parameter integer NetworkIfFlitWidth               = 0,  // Network configuration. Flit size (in bits). This is the flow control unit used in the network. This is the network_layer_packet.
@@ -189,13 +191,26 @@ module single_unit_network_interface #(
   wire [1:0]                                network_ejector_demux_ready;
   wire [NetworkIfVirtualNetworkIdWidth-1:0] network_ejector_demux_select;
 
+  // Drive AXI-Stream tonet module signals and network injector input signals
+  // This interface will be converted into a Transport Layer Packet (tlp) interface
+  // in the future. It will facilitate maintainance when different protocols
+  // will be routed through the network
+  // The tonets enable the transport layer packet format and protocol
+  wire                                      tlp_valid;
+  wire                                      tlp_ready;
+  wire [NetworkIfFlitWidth-1:0]             tlp_flit;
+  wire [NetworkIfFlitTypeWidth-1:0]         tlp_flit_type;
+  wire [NetworkIfBroadcastWidth-1:0]        tlp_broadcast;
+  wire [NetworkIfVirtualChannelIdWidth-1:0] tlp_virtual_channel_id;
 
-  // Drive AXI-Stream tonet module signals and network output ports
-  wire                                      network_valid;
-  wire [NetworkIfFlitWidth-1:0]             network_flit;
-  wire [NetworkIfFlitTypeWidth-1:0]         network_flit_type;
-  wire [NetworkIfBroadcastWidth-1:0]        network_broadcast;
-  wire [NetworkIfVirtualChannelIdWidth-1:0] network_virtual_channel_id;
+  // Drive local network traffic between network_injector and network_ejector  
+  wire                                      local_network_traffic_valid;
+  wire                                      local_network_traffic_ready;
+  wire [NetworkIfFlitWidth-1:0]             local_network_traffic_flit;
+  wire [NetworkIfFlitTypeWidth-1:0]         local_network_traffic_flit_type;
+  wire [NetworkIfBroadcastWidth-1:0]        local_network_traffic_broadcast;
+  wire [NetworkIfVirtualNetworkIdWidth-1:0] local_network_traffic_virtual_network_id;
+
 
   // Drive axistream fromnet and axi-stream (initiator) output port
   wire [AxiStreamInitiatorIfTDataWidth-1:0]  m_axis_tdata;
@@ -217,12 +232,6 @@ module single_unit_network_interface #(
   assign m_axis_tlast_o  = m_axis_tlast;
   assign m_axis_tid_o    = m_axis_tid;
   assign m_axis_tdest_o  = m_axis_tdest;
-
-  assign network_valid_o              = network_valid;
-  assign network_flit_o               = network_flit;
-  assign network_flit_type_o          = network_flit_type;
-  assign network_broadcast_o          = network_broadcast;
-  assign network_virtual_channel_id_o = network_virtual_channel_id;
 
   generate
     // This interface is used for connecting to an initiator unit
@@ -254,20 +263,20 @@ module single_unit_network_interface #(
         .s_axis_tid_i   (s_axis_tid_i),
         .s_axis_tdest_i (s_axis_tdest_i),
 
-        .network_valid_o             (axi2noc_valid),
-        .network_ready_i             (axi2noc_ready),
-        .network_flit_o              (network_flit),
-        .network_flit_type_o         (network_flit_type),
-        .network_broadcast_o         (network_broadcast),
-        .network_virtual_channel_id_o(network_virtual_channel_id)
+        .network_valid_o             (tlp_valid),
+        .network_ready_i             (tlp_ready),
+        .network_flit_o              (tlp_flit),
+        .network_flit_type_o         (tlp_flit_type),
+        .network_broadcast_o         (tlp_broadcast),
+        .network_virtual_channel_id_o(tlp_virtual_channel_id)
       );
     end else begin
-      assign s_axis_tready   = 1'b1;  // perfect sink, although it is an invalid path actually
-      assign axi2noc_valid   = 1'b0;
-      assign network_flit    = {NetworkIfFlitWidth{1'b0}};
-      assign network_flit_type = {NetworkIfFlitTypeWidth{1'b0}};
-      assign network_broadcast = {NetworkIfBroadcastWidth{1'b0}};
-      assign network_virtual_channel_id = {NetworkIfVirtualChannelIdWidth{1'b0}};
+      assign s_axis_tready = 1'b1;  // perfect sink, although it is an invalid path actually
+      assign tlp_valid              = 1'b0;
+      assign tlp_flit               = {NetworkIfFlitWidth{1'b0}};
+      assign tlp_flit_type          = {NetworkIfFlitTypeWidth{1'b0}};
+      assign tlp_broadcast          = {NetworkIfBroadcastWidth{1'b0}};
+      assign tlp_virtual_channel_id = {NetworkIfVirtualChannelIdWidth{1'b0}};
     end
   endgenerate
 
@@ -315,19 +324,60 @@ module single_unit_network_interface #(
   endgenerate
 
 
-  // Adapt standard valid/ready handshake to Router custom handshake
-  validready2noc_handshake_adapter #(
-    .NumberOfVirtualChannels(NetworkIfNumberOfVirtualChannels),
-    .VirtualChannelIdWidth  (NetworkIfVirtualChannelIdWidth)
-  ) traffic_injector_inst (
-    .valid_i             (axi2noc_valid),
-    .ready_o             (axi2noc_ready),
-    .virtual_channel_id_i(network_virtual_channel_id),
+//  // Adapt standard valid/ready handshake to Router custom handshake
+//  validready2noc_handshake_adapter #(
+//    .NumberOfVirtualChannels(NetworkIfNumberOfVirtualChannels),
+//    .VirtualChannelIdWidth  (NetworkIfVirtualChannelIdWidth)
+//  ) traffic_injector_inst (
+//    .valid_i             (axi2noc_valid),
+//    .ready_o             (axi2noc_ready),
+//    .virtual_channel_id_i(network_virtual_channel_id),
+//
+//    .valid_o(network_valid),
+//    .avail_i(network_ready_i)
+//  );
+  
 
-    .valid_o(network_valid),
-    .avail_i(network_ready_i)
-  );
-
+  // It receives the Transport layer interface signals from the tonets
+  // and generates the network layer interface signals consisting of
+  // network packets and flits
+  network_injector #(
+    .NetworkIfAddressId              (NetworkIfAddressId),
+    .NetworkIfFlitWidth              (NetworkIfFlitWidth),
+    .NetworkIfFlitTypeWidth          (NetworkIfFlitTypeWidth),
+    .NetworkIfBroadcastWidth         (NetworkIfBroadcastWidth),
+    .NetworkIfVirtualNetworkIdWidth  (NetworkIfVirtualNetworkIdWidth),  
+    .NetworkIfVirtualChannelIdWidth  (NetworkIfVirtualChannelIdWidth),  
+    .NetworkIfNumberOfVirtualChannels(NetworkIfNumberOfVirtualChannels),
+    .NetworkIfNumberOfVirtualNetworks(NetworkIfNumberOfVirtualNetworks)
+  ) injector_inst (
+    .clk_i(clk_network_i),
+    .rst_i(rst_network_i), 
+ 
+    // Transport layer packet interface coming from tonet
+    .tlp_valid_i             (tlp_valid),
+    .tlp_ready_o             (tlp_ready),
+    .tlp_flit_i              (tlp_flit),
+    .tlp_flit_type_i         (tlp_flit_type),
+    .tlp_broadcast_i         (tlp_broadcast),
+    .tlp_virtual_channel_id_i(tlp_virtual_channel_id),
+   
+    // Network interface with the router
+    .network_valid_o             (network_valid_o),
+    .network_avail_i             (network_ready_i),
+    .network_flit_o              (network_flit_o),
+    .network_flit_type_o         (network_flit_type_o),
+    .network_broadcast_o         (network_broadcast_o),
+    .network_virtual_channel_id_o(network_virtual_channel_id_o),
+  
+    // Network interface with the local ejector
+    .local_valid_o             (local_network_traffic_valid),
+    .local_ready_i             (local_network_traffic_ready),
+    .local_flit_o              (local_network_traffic_flit),
+    .local_flit_type_o         (local_network_traffic_flit_type),
+    .local_broadcast_o         (local_network_traffic_broadcast),
+    .local_virtual_network_id_o(local_network_traffic_virtual_network_id)
+  ); 
 
   generate
     if (FileRegTargetIfEnable != 0) begin : filereg_target_if
@@ -436,7 +486,15 @@ module single_unit_network_interface #(
     .ready_i(data_from_network_ready),
     .data_o (data_from_network),
 
-    // Router interface
+    // Network interface for local traffic
+    .local_valid_i             (local_network_traffic_valid),
+    .local_ready_o             (local_network_traffic_ready),
+    .local_flit_i              (local_network_traffic_flit),
+    .local_flit_type_i         (local_network_traffic_flit_type),
+    .local_broadcast_i         (local_network_traffic_broadcast),
+    .local_virtual_network_id_i(local_network_traffic_virtual_network_id),
+
+    // Network interface with the router
     .network_valid_i             (network_valid_i),
     .network_ready_o             (network_ready_o),
     .network_flit_i              (network_flit_i),
