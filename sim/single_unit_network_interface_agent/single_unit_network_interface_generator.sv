@@ -83,7 +83,10 @@ class single_unit_network_interface_generator;
     int next_transfer_belong_to_same_axiframe = 0;
     for(int i = 0; i < total_transactions; i++) begin
       axi4stream_transaction item = m_axis_manager_agent.driver.create_transaction("axis_manager_data_transaction"); 
-      WR_TRANSACTION_FAIL: assert(item.randomize());
+      // prevent local traffic
+      do begin
+        WR_TRANSACTION_FAIL: assert(item.randomize());
+      end while (item.get_dest() == 0);
       if ((next_transfer_belong_to_same_axiframe == 0) && (item.get_last() == 0)) begin
         next_transfer_belong_to_same_axiframe = 1;
         tid_axiframe = item.get_id();

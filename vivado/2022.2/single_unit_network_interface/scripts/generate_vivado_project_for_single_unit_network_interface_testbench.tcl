@@ -29,6 +29,7 @@
 #    "<repo_dir>/vivado/2022.2/single_unit_network_interface/sim/duv.v"
 #
 #    "<repo_dir>/rtl/misc/axis_2_native_fifo.v"
+#    "<repo_dir>/rtl/common/fixed_priority_arbiter_with_hold.v"
 #    "<repo_dir>/rtl/common/axis_converter_signals.v"
 #    "<repo_dir>/rtl/network_interface/axis_data_downsizer.v"
 #    "<repo_dir>/rtl/network_interface/axis_data_upsizer.v"
@@ -40,6 +41,7 @@
 #    "<repo_dir>/rtl/misc/fifo_type_1_async_axis_wrapper.v"
 #    "<repo_dir>/rtl/misc/native_fifo_2_axi.v"
 #    "<repo_dir>/rtl/network_interface/network_data_axis_downsizer.v"
+#    "<repo_dir>/rtl/network_interface/network_injector.v"
 #    "<repo_dir>/rtl/network_interface/network_ejector.v"
 #    "<repo_dir>/rtl/network_interface/network_signal_converter.v"
 #    "<repo_dir>/rtl/network_interface/noc_outport_handshake_adapter.v"
@@ -65,6 +67,7 @@ proc checkRequiredFiles { origin_dir} {
  "[file normalize "$origin_dir/vivado/2022.2/single_unit_network_interface/ip/axi4stream_vip_m/axi4stream_vip_m.xci"]"\
  "[file normalize "$origin_dir/rtl/misc/axis_2_native_fifo.v"]"\
  "[file normalize "$origin_dir/rtl/common/axis_converter_signals.v"]"\
+ "[file normalize "$origin_dir/rtl/common/fixed_priority_arbiter_with_hold.v"]"\
  "[file normalize "$origin_dir/rtl/network_interface/axis_data_downsizer.v"]"\
  "[file normalize "$origin_dir/rtl/network_interface/axis_data_upsizer.v"]"\
  "[file normalize "$origin_dir/rtl/network_interface/filereg_fromnet.v"]"\
@@ -75,6 +78,7 @@ proc checkRequiredFiles { origin_dir} {
  "[file normalize "$origin_dir/rtl/misc/fifo_type_1_async_axis_wrapper.v"]"\
  "[file normalize "$origin_dir/rtl/misc/native_fifo_2_axi.v"]"\
  "[file normalize "$origin_dir/rtl/network_interface/network_data_axis_downsizer.v"]"\
+ "[file normalize "$origin_dir/rtl/network_interface/network_injector.v"]"\
  "[file normalize "$origin_dir/rtl/network_interface/network_ejector.v"]"\
  "[file normalize "$origin_dir/rtl/network_interface/network_signal_converter.v"]"\
  "[file normalize "$origin_dir/rtl/network_interface/noc_outport_handshake_adapter.v"]"\
@@ -210,11 +214,16 @@ if {[string equal [get_filesets -quiet sources_1] ""]} {
   create_fileset -srcset sources_1
 }
 
+set obj [get_filesets sources_1]
+set_property -name "include_dirs" -value "[file normalize "$repo_dir/rtl/router-vc"]" -objects $obj
+
+
 # Set 'sources_1' fileset object
 set obj [get_filesets sources_1]
 set files [list \
  [file normalize "${repo_dir}/rtl/misc/axis_2_native_fifo.v"] \
  [file normalize "${repo_dir}/rtl/common/axis_converter_signals.v"] \
+ [file normalize "${repo_dir}/rtl/common/fixed_priority_arbiter_with_hold.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/axis_data_downsizer.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/axis_data_upsizer.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/filereg_fromnet.v"] \
@@ -225,6 +234,7 @@ set files [list \
  [file normalize "${repo_dir}/rtl/misc/fifo_type_1_async_axis_wrapper.v"] \
  [file normalize "${repo_dir}/rtl/misc/native_fifo_2_axi.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/network_data_axis_downsizer.v"] \
+ [file normalize "${repo_dir}/rtl/network_interface/network_injector.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/network_ejector.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/network_signal_converter.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/noc_outport_handshake_adapter.v"] \
@@ -347,7 +357,7 @@ set_property -name "file_type" -value "SystemVerilog" -objects $file_obj
 
 # Set 'sim_1' fileset properties
 set obj [get_filesets sim_1]
-set_property -name "include_dirs" -value "[file normalize "/opt/Xilinx/Vivado/2022.2/data/xilinx_vip/include"] [file normalize "$repo_dir/sim/network_ejector_agent"] [file normalize "$repo_dir/sim/single_unit_network_interface_agent"]" -objects $obj
+set_property -name "include_dirs" -value "[file normalize "/opt/Xilinx/Vivado/2022.2/data/xilinx_vip/include"] [file normalize "$repo_dir/sim/network_ejector_agent"] [file normalize "$repo_dir/sim/single_unit_network_interface_agent"] [file normalize "$repo_dir/rtl/router-vc"]" -objects $obj
 set_property -name "top" -value "tb" -objects $obj
 set_property -name "top_lib" -value "xil_defaultlib" -objects $obj
 set_property -name "xsim.simulate.xsim.more_options" -value "-sv_seed 12351" -objects $obj
