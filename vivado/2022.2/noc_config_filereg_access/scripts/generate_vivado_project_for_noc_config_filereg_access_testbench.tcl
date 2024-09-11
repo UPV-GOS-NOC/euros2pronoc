@@ -23,6 +23,7 @@
 #
 #    NI:
 #    "<repo_dir>/rtl/common/axis_converter_signals.v"
+#    "<repo_dir>/rtl/common/fixed_priority_arbiter_with_hold.v"
 #    "<repo_dir>/rtl/common/fifo_type_1_async/fifo_mem.v"
 #    "<repo_dir>/rtl/common/fifo_type_1_async/fifo_type_1_async.v"
 #    "<repo_dir>/rtl/common/fifo_type_1_async/rd_ptr_empty.v"
@@ -37,6 +38,7 @@
 #    "<repo_dir>/rtl/network_interface/axistream_fromnet.v"
 #    "<repo_dir>/rtl/network_interface/axistream_tonet.v"
 #    "<repo_dir>/rtl/network_interface/network_data_axis_downsizer.v"
+#    "<repo_dir>/rtl/network_interface/network_injector.v"
 #    "<repo_dir>/rtl/network_interface/network_ejector.v"
 #    "<repo_dir>/rtl/network_interface/network_signal_converter.v"
 #    "<repo_dir>/rtl/network_interface/noc_outport_handshake_adapter.v"
@@ -177,6 +179,7 @@ puts "  proj_name: ${_xil_proj_name_}\n"
 
 set source_files_to_add [list \
  [file normalize "${repo_dir}/rtl/common/axis_converter_signals.v"] \
+ [file normalize "${repo_dir}/rtl/common/fixed_priority_arbiter_with_hold.v"] \
  [file normalize "${repo_dir}/rtl/common/fifo_type_1_async/fifo_mem.v"] \
  [file normalize "${repo_dir}/rtl/common/fifo_type_1_async/fifo_type_1_async.v"] \
  [file normalize "${repo_dir}/rtl/common/fifo_type_1_async/rd_ptr_empty.v"] \
@@ -191,6 +194,7 @@ set source_files_to_add [list \
  [file normalize "${repo_dir}/rtl/network_interface/axistream_fromnet.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/axistream_tonet.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/network_data_axis_downsizer.v"] \
+ [file normalize "${repo_dir}/rtl/network_interface/network_injector.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/network_ejector.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/network_signal_converter.v"] \
  [file normalize "${repo_dir}/rtl/network_interface/noc_outport_handshake_adapter.v"] \
